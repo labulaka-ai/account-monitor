@@ -98,6 +98,22 @@
         <button id="btnCopyConf" class="btn ghost sm" type="button">复制配置</button>
       </div>
 
+      <h3>关于</h3>
+      <p class="sheet-note">
+        代码全部开源，AGPL-3.0。数据、登录态、读到的每一个数都只在这台电脑上，
+        没有服务器，也没有账号体系。
+      </p>
+      <div class="aboutrow">
+        <button id="btnRepo" class="btn ghost sm" type="button">项目主页</button>
+        <button id="btnStar" class="btn ghost sm" type="button">
+          <svg class="starico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2.9l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.92 6.12 21.01l1.12-6.55L2.48 9.82l6.58-.96z" />
+          </svg>
+          去点个 Star
+        </button>
+        <span class="aboutver" id="aboutVer">v—</span>
+      </div>
+
       <div class="sheet-foot">
         <button id="btnCloseSettings" class="btn primary block" type="button">完成</button>
       </div>
@@ -229,6 +245,28 @@
   </footer>
 
   <div id="toast" class="toast" hidden></div>
+
+  <!-- 用了一阵子之后的一次性提示。只在主页、手上没别的事的时候浮出来，
+       点「以后再说」两周后再问，点「不再提示」就永不再出现。 -->
+  <div id="starNudge" class="nudge" hidden>
+    <span class="nudge-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2.9l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.92 6.12 21.01l1.12-6.55L2.48 9.82l6.58-.96z" />
+      </svg>
+    </span>
+    <div class="nudge-txt">
+      <b>用得顺手的话，给个项目点个 Star</b>
+      <p>开源工具没有下载量报表，Star 是唯一能看到的「有人在用」。</p>
+      <div class="nudge-acts">
+        <button id="nudgeGo" class="btn primary sm" type="button">去点个 Star</button>
+        <button id="nudgeLater" class="btn text sm" type="button">以后再说</button>
+        <button id="nudgeNever" class="btn text sm" type="button">不再提示</button>
+      </div>
+    </div>
+    <button id="nudgeClose" class="nudge-x" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>
+    </button>
+  </div>
 
 </div>
 

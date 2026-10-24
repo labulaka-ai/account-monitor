@@ -1848,3 +1848,104 @@ body.panel-open.view-detail .wrap {
 body.light .dailyrow input[type='time']::-webkit-calendar-picker-indicator {
   filter: none;
 }
+
+/* ==========================================================================
+   关于 / 项目主页 / Star 提示
+   一个开源工具唯一能看到的「有人在用」就是 Star，所以这件事做得克制但不藏：
+   设置里常驻入口，外加一个两周最多一次、随手能关的角落提示。
+   ========================================================================== */
+
+.aboutrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.btn .starico {
+  width: 13px;
+  height: 13px;
+  margin-right: 6px;
+  fill: currentColor;
+  vertical-align: -2px;
+}
+
+.aboutver {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.nudge {
+  position: fixed;
+  right: 24px;
+  bottom: 62px;
+  z-index: 70;
+  display: flex;
+  gap: 12px;
+  width: 356px;
+  padding: 15px 16px 14px;
+  border-radius: 15px;
+  background: var(--sheet);
+  border: 1px solid var(--line-hi);
+  box-shadow: var(--lift);
+  backdrop-filter: blur(14px);
+  animation: nudgeIn 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes nudgeIn {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+.nudge-ico {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--halo-a);
+}
+
+.nudge-ico svg {
+  width: 15px;
+  height: 15px;
+  fill: var(--accent);
+}
+
+.nudge-txt { min-width: 0; padding-right: 14px; }
+.nudge-txt b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.nudge-txt p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--ink-3); }
+.nudge-acts { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin-top: 11px; }
+
+/* 这几个按钮绝不能折行：「以后再说」被挤成三行会显得整块都很局促 */
+.nudge-acts .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.nudge-acts .btn.text { padding: 7px 7px; }
+
+.nudge-x {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.nudge-x:hover { color: var(--ink); background: var(--soft); }
+.nudge-x svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+/* 面板是原生视图，永远压在网页上面：开着面板时别让它露半截 */
+body.panel-open .nudge { display: none; }

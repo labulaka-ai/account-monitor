@@ -208,6 +208,74 @@ function renderGrid() {
   $('stTodo').textContent = list.filter((p) => p.status !== 'ok').length;
 }
 
+// ---------------------------------------------------------------- 项目主页 / Star
+/**
+ * 开源项目的「Star」入口。
+ *
+ * 分寸比按钮重要：一进应用就要 star 会让人反感，所以三条限制——
+ * 用满三天、打开过三次、两周最多问一次；正在做别的事（面板/浮层/详情页）时一律让路。
+ * 「不再提示」写到偏好里，之后永不再出现。
+ */
+const REPO_URL = 'https://github.com/labulaka-ai/account-monitor';
+const STAR_QUIET = 3 * 864e5;   // 装上先自己用三天
+const STAR_GAP = 14 * 864e5;    // 两次提示之间至少两周
+
+function openRepo() {
+  window.api.openExternal(REPO_URL);
+}
+
+/** 每次启动记一笔：既算「打开过几次」，也记下第一次用的日子 */
+function noteLaunch() {
+  const s = (prefs.star = prefs.star || {});
+  s.opens = (s.opens || 0) + 1;
+  if (!s.first) s.first = Date.now();
+  savePrefs();
+}
+
+function starDue() {
+  const s = prefs.star || {};
+  if (s.never) return false;
+  if ((s.opens || 0) < 3) return false;
+  if (Date.now() - (s.first || 0) < STAR_QUIET) return false;
+  if (s.last && Date.now() - s.last < STAR_GAP) return false;
+  // 手上正有事就别插话：面板是原生视图，浮层和详情页占着注意力
+  if (document.body.classList.contains('panel-open')) return false;
+  if (!$('settings').hidden || !$('exportSheet').hidden || !$('detail').hidden) return false;
+  return true;
+}
+
+let nudgeTimer = 0;
+
+function hideNudge() {
+  clearTimeout(nudgeTimer);
+  const n = $('starNudge');
+  if (n) n.hidden = true;
+}
+
+function showNudge() {
+  const n = $('starNudge');
+  if (!n) return;
+  n.hidden = false;
+  clearTimeout(nudgeTimer);
+  // 20 秒自己收走，不赖在那儿
+  nudgeTimer = setTimeout(hideNudge, 20000);
+}
+
+/** 记一笔：last 让下一次提示至少隔两周；never 就是永久别再提 */
+function markStar(flag) {
+  const s = (prefs.star = prefs.star || {});
+  s.last = Date.now();
+  if (flag) s[flag] = true;
+  savePrefs();
+}
+
+/** 首屏、自动更新都跑完再说，别和「正在读取」抢注意力 */
+function armStarNudge() {
+  setTimeout(() => {
+    if (starDue()) showNudge();
+  }, 12000);
+}
+
 // ---------------------------------------------------------------- 设置
 function renderPicker() {
   const box = $('platPicker');
@@ -223,6 +291,7 @@ function renderPicker() {
 }
 
 function openSettings() {
+  hideNudge();          // 角落提示和浮层不叠在一起
   renderPicker();
   applyTheme();
   renderAiBox();
@@ -1642,10 +1711,13 @@ window.__chRefresh = () => {
 // ---------------------------------------------------------------- 启动
 async function boot() {
   bindToastActions();
+  noteLaunch();
   try {
     const info = await window.api.info();
     footHomeText = `数据存在本机 · v${info.version}`;
     $('footLeft').textContent = footHomeText;
+    $('aboutVer').textContent = `v${info.version}`;
+    $('btnRepo').title = REPO_URL;
     await refresh();
   } catch (err) {
     $('footLeft').textContent = `启动失败：${err.message}`;
@@ -1804,6 +1876,27 @@ async function boot() {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('settings').hidden) closeSettings();
+  });
+
+  // ---------------------------------------------------------- 关于 / Star
+  $('btnRepo').addEventListener('click', openRepo);
+  $('btnStar').addEventListener('click', openRepo);
+  $('nudgeGo').addEventListener('click', () => {
+    openRepo();
+    markStar('clicked');
+    hideNudge();
+  });
+  $('nudgeLater').addEventListener('click', () => {
+    markStar();
+    hideNudge();
+  });
+  $('nudgeNever').addEventListener('click', () => {
+    markStar('never');
+    hideNudge();
+  });
+  $('nudgeClose').addEventListener('click', () => {
+    markStar();
+    hideNudge();
   });
 
   $('platPicker').addEventListener('change', (e) => {
@@ -1965,6 +2058,8 @@ async function boot() {
     PLATS = list;
     renderGrid();
   });
+
+  armStarNudge();
 }
 
 // 先上主题再拉数据：晚一步用户会看到深色闪一下
