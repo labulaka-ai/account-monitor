@@ -88,6 +88,17 @@ npm run restore:personal # 挪回来
 为什么：这类工具要能放三年还能跑。依赖越少，三年后 `npm install` 失败的概率越低。
 副作用是安装包小、没有 native 编译、不用担心供应链投毒。
 
+## 图标
+
+源图在 `build/icon-source.jpg`，跑 `npm run icon` 生成 `icon.png` / `icon.icns` / `icon.ico`。
+
+形状不是直接裁圆角矩形，而是按 macOS 的超椭圆（`|x|^n + |y|^n = 1`，n=5）
+算 4×4 超采样 alpha —— 正圆角在大尺寸下能看出「方肩」，和系统里其它图标并排会露怯。
+刻度照 Apple 的规范：1024 画布、824 主体、四周各留 100。
+
+换图案只换源图，别手改生成的三个文件（尤其 icns：它里面是 10 个尺寸，手改必然漏）。
+`npm run icon -- --crop 1.06` 可以调主体占比，数字越大图越满。
+
 ## 目录结构
 
 ```
@@ -95,7 +106,8 @@ main.js              Electron 主进程（窗口、IPC、读数调度）
 preload.js           上下文隔离桥
 lib/
   adapters/          平台定义（加平台改这里一个数组）
-  collectors.js      各平台取数脚本（在页面内执行）
+  platforms/         各平台取数脚本，一个平台一个文件（在页面内执行）
+  collectors.js      把上面这些拼成注册表
   reader.js          读数编排 + 逐页对账
   sync.js            读数结果写库
   scheduler.js       每日自动更新
@@ -104,8 +116,17 @@ lib/
   db.js migrations.js
 ui/                  前端（零构建，原生 JS）
 mcp/server.js        MCP 服务，让 AI 读取你的数据
-scripts/             打包前清理个人数据
+scripts/             图标生成、打包前清理个人数据
 ```
+
+### 加一个平台
+
+在 `lib/platforms/` 新建一个文件，导出一个 `pages` 数组，
+再到 `lib/collectors.js` 的 `MODULES` 里加一行。别的平台的代码不用碰。
+
+**每个页面脚本都会被 `toString()` 后注入到平台页面里单独执行**，所以函数体不能引用
+文件外的任何变量 —— 连本文件里的 `const` 也不行。要小工具就写在函数体里面。
+这条约定由 `test/scripts.test.js` 守着：它去掉注释和字符串之后，比对平台文件里的顶层变量名。
 
 ## AI 接入（可选）
 
