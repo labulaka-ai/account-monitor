@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<title>账号监控</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+<div class="drag"></div>
+<div class="halo" aria-hidden="true"></div>
+
+<div class="wrap">
+
+  <header class="head">
+    <div class="eyebrow"><i class="led"></i>LOCAL ONLY<span class="sep">/</span>数据不出这台电脑</div>
+
+    <button id="btnSettings" class="gear" type="button" title="设置" aria-label="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" aria-hidden="true">
+        <path d="M4 9h9M17 9h3M4 15h3M11 15h9" />
+        <circle cx="15" cy="9" r="2" />
+        <circle cx="9" cy="15" r="2" />
+      </svg>
+    </button>
+
+    <h1>账号监控</h1>
+    <p class="sub">每个号一个独立环境。登录由你本人完成——我们不碰密码，也不代替你点赞、关注、发布。</p>
+    <div class="stats">
+      <span class="chip"><b id="stPlat">0</b><em>平台</em></span>
+      <span class="chip"><b id="stReady">0</b><em>已登录</em></span>
+      <span class="chip"><b id="stTodo">0</b><em>待登录</em></span>
+    </div>
+  </header>
+
+  <div id="settings" class="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-label="设置">
+      <h3>显示在主页的平台</h3>
+      <p class="sheet-note">取消勾选只是不显示，已登录的环境不会丢，随时能勾回来。</p>
+      <div id="platPicker" class="picker"></div>
+
+      <h3>外观</h3>
+      <div class="seg" id="themeSeg" role="group" aria-label="外观">
+        <button type="button" data-theme="dark">深色</button>
+        <button type="button" data-theme="light">浅色</button>
+        <button type="button" data-theme="auto">跟随系统</button>
+      </div>
+
+      <h3>自动更新</h3>
+      <p class="sheet-note">
+        每天早上自动读一次（应用开着就生效）。其他时候点「刷新数据」才读。
+        读太勤会被平台当成机器人，所以每个号都有最短间隔。
+      </p>
+      <div class="airow">
+        <label class="aiallow">
+          <input id="dailyOn" type="checkbox" />
+          <span>每天自动更新</span>
+        </label>
+        <span id="dailyState" class="aistate">—</span>
+      </div>
+      <div id="dailyBox" class="aibox" hidden>
+        <div class="dailyrow">
+          <span class="ailabel">每天</span>
+          <input id="dailyTime" type="time" step="60" />
+          <button id="btnDailyNow" class="btn ghost sm" type="button">现在全部更新</button>
+        </div>
+        <p class="sheet-note" id="dailyHint"></p>
+      </div>
+
+      <h3>让别的 AI 读这里的数据</h3>
+      <p class="sheet-note">
+        开着的时候，本机上一个端口会提供数据给 AI 用（只监听本机，别的机器连不上）。
+        关掉就彻底关掉，端口不监听。
+      </p>
+      <div class="airow">
+        <label class="aiallow">
+          <input id="aiToggle" type="checkbox" />
+          <span>允许 AI 读取</span>
+        </label>
+        <span id="aiState" class="aistate">未开启</span>
+      </div>
+      <div id="aiBox" class="aibox" hidden>
+        <div class="aikey">
+          <span class="ailabel">密钥</span>
+          <code id="aiToken">—</code>
+          <button id="btnCopyToken" class="btn ghost sm" type="button">复制</button>
+          <button id="btnRotateToken" class="btn ghost sm danger" type="button">换一个</button>
+        </div>
+        <div class="aiurl"><span class="ailabel">地址</span><code id="aiUrl">—</code></div>
+        <p class="sheet-note">
+          把下面这段贴到 Claude Desktop / Cursor 的 MCP 配置里就能连上。密钥不用写进去，
+          AI 会自己从本机读。
+        </p>
+        <pre id="aiConf" class="aiconf"></pre>
+        <p class="sheet-note" id="aiConfNote" hidden></p>
+        <button id="btnCopyConf" class="btn ghost sm" type="button">复制配置</button>
+      </div>
+
+      <div class="sheet-foot">
+        <button id="btnCloseSettings" class="btn primary block" type="button">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导出：数据（Excel/JSON/CSV）与报告（MD/Word/PDF）放在同一个入口，
+       因为用户想的是「我要把这个拿出去」，而不是「我要导出还是生成报告」 -->
+  <div id="exportSheet" class="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-label="导出">
+      <h3>导出</h3>
+
+      <div class="exseg" id="exKind" role="group" aria-label="导出类型">
+        <button type="button" data-kind="data" class="on">数据表格</button>
+        <button type="button" data-kind="report">分析报告</button>
+      </div>
+
+      <h3 id="exRangeLabel">时间范围</h3>
+      <div class="exseg" id="exRange" role="group" aria-label="时间范围">
+        <button type="button" data-range="week">本周</button>
+        <button type="button" data-range="month" class="on">本月</button>
+        <button type="button" data-range="year">今年</button>
+        <button type="button" data-range="all">全部</button>
+      </div>
+
+      <h3>格式</h3>
+      <div class="exseg" id="exFormat" role="group" aria-label="格式"></div>
+
+      <!-- 平台范围：报告是「按平台」组织内容的，所以先选平台再选号 -->
+      <h3>平台</h3>
+      <div class="exseg expat" id="exPlats" role="group" aria-label="平台范围"></div>
+      <label class="exsplit" id="exSplitWrap" hidden>
+        <input type="checkbox" id="exSplit" />
+        <span>每个平台各出一份文件<em>（不合并，方便单独发给某个平台）</em></span>
+      </label>
+
+      <h3>账号</h3>
+      <p class="sheet-note" id="exScopeNote">默认全部账号。取消勾选就只导选中的。</p>
+      <div id="exAccounts" class="expick"></div>
+
+      <p class="exhint" id="exHint"></p>
+
+      <div class="sheet-foot">
+        <button id="btnDoExport" class="btn primary block" type="button">导出</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="grid" class="grid" aria-label="平台列表"></main>
+
+  <main id="detail" class="detail" hidden>
+    <div class="detail-top">
+      <button id="btnBackGrid" class="back" type="button"><span class="chev">‹</span>返回平台</button>
+      <div class="detail-id">
+        <span class="side-icon" id="dIcon"></span>
+        <div class="detail-txt">
+          <h2 id="dTitle">—</h2>
+          <p id="dSub" class="side-sub">—</p>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button id="btnRefresh" class="btn ghost sm" type="button">刷新数据</button>
+        <button id="btnRelogin" class="btn ghost sm" type="button">重新登录</button>
+        <button id="btnLogout" class="btn ghost sm danger" type="button" title="清掉这个号专属环境里的登录态，数据和历史都保留">退出登录</button>
+        <button id="btnExport" class="btn ghost sm" type="button">导出</button>
+      </div>
+    </div>
+
+    <div id="dProgress" class="dprog" hidden><i></i><span id="dProgText">正在读取…</span></div>
+
+    <div id="dTabs" class="dtabs"></div>
+    <div id="dMetrics" class="dmetrics"></div>
+    <div id="dInsight" class="dinsight" hidden></div>
+    <div id="dCharts" class="dcharts"></div>
+
+    <div id="dWorkTabs" class="dwtabs" hidden></div>
+    <div class="dtable">
+      <div id="dHead" class="dthead"></div>
+      <div id="dBody" class="dbody"></div>
+    </div>
+
+    <div id="dNote" class="dnote" hidden></div>
+  </main>
+
+  <section id="side" class="side" hidden>
+    <button id="btnBack" class="back" type="button"><span class="chev">‹</span>返回平台</button>
+
+    <div class="side-top">
+      <span class="side-icon" id="sideIcon"></span>
+      <div class="side-id">
+        <h2 id="sideTitle">正在连接</h2>
+        <p id="sideSub" class="side-sub">独立环境</p>
+      </div>
+    </div>
+
+    <p class="side-lead">
+      在右侧面板里用<strong>你自己的账号</strong>登录，登完点下面的「完成登录」。
+    </p>
+
+    <ul class="side-list">
+      <li>不会自动点赞、关注或发布任何内容</li>
+      <li>不记录密码，只保留登录态</li>
+      <li>数据只写进这台电脑，不上传</li>
+    </ul>
+
+    <div id="sideHint" class="hint" hidden></div>
+
+    <div class="alt">
+      <span>登不上？如果 Chrome 里已经登着这个号，</span>
+      <button id="btnImport" class="link" type="button">从 Chrome 导入</button>
+    </div>
+
+    <div class="side-actions">
+      <button id="btnDone" class="btn primary block">完成登录</button>
+      <div class="side-row">
+        <button id="btnReload" class="btn ghost">重新加载</button>
+        <button id="btnCancel" class="btn text">取消</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span id="footLeft">数据存在本机</span>
+    <span class="foot-right">
+      <button id="btnExportAll" class="link" type="button">导出 / 报告</button>
+      <button id="btnDiag" class="link" type="button">诊断</button>
+      <button id="btnData" class="link" type="button">打开数据文件夹</button>
+    </span>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+</div>
+
+<script src="icons.js"></script>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

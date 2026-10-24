@@ -1,0 +1,1850 @@
+/* ==========================================================================
+   账号监控 · 界面样式
+   基调：深色 + 细网格底纹 + 品牌色微光。
+   克制原则：全屏只有一个强调色（--accent），品牌色只出现在图标和悬停微光里，
+   绝不用品牌色当文字色——十二个平台各染一色，界面会立刻变廉价。
+   ========================================================================== */
+
+:root {
+  --bg: #08090b;
+  --card: rgba(255, 255, 255, 0.042);
+  --card-hi: rgba(255, 255, 255, 0.062);
+  --line: rgba(255, 255, 255, 0.075);
+  --line-hi: rgba(255, 255, 255, 0.16);
+  --ink: #f4f5f7;
+  /* 次要文字的透明度是算过的，不是随手定的：
+     ink-2 0.68 → 对底色 6.8:1，ink-3 0.5 → 4.97:1。
+     原来 0.6 / 0.36 只有 6.8 / 3.07，后者低于 4.5 的底线，小字会糊。 */
+  --ink-2: rgba(244, 245, 247, 0.68);
+  --ink-3: rgba(244, 245, 247, 0.5);
+  --accent: #5b8cff;
+  --ok: #3ddc97;
+  --bad: #ff5d5d;
+  /* 面板宽度的默认值。主进程量完会立刻用真实值覆盖，
+     但第一帧也得有个数，否则内容会先占满再跳。 */
+  --panel-w: 620px;
+  --r: 16px;
+  /* 字体栈按平台顺序排：macOS 先命中 PingFang，Windows 命中微软雅黑，
+     Linux 落到 Noto/思源。少任何一个都会有平台变成「细而无衬线」的默认字。 */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Microsoft YaHei", "微软雅黑", "Segoe UI", "Noto Sans CJK SC", "Source Han Sans SC",
+    "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* 以下这些原本写死成 rgba(255,255,255,·)，浅色主题下会全部失效。
+     抽成变量：深色是「白色叠加」，浅色换成「黑色叠加」，一处切换全局生效。 */
+  --grid: rgba(255, 255, 255, 0.03);
+  --chip: rgba(255, 255, 255, 0.028);
+  --card-lo: rgba(255, 255, 255, 0.014);
+  --sheen: rgba(255, 255, 255, 0.055);
+  --sheen-hi: rgba(255, 255, 255, 0.08);
+  --tint-base: rgba(255, 255, 255, 0.035);
+  --soft: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.28);
+  --scroll: rgba(255, 255, 255, 0.1);
+  --shadow: 0 14px 28px -22px #000;
+  --halo-a: rgba(91, 140, 255, 0.18);
+  --halo-b: rgba(150, 92, 255, 0.13);
+  --sheet: rgba(18, 20, 24, 0.92);
+
+  /* 语义色：以前 .hint / .badge 直接写死 #ffd9a8 这类「浅色字」，在深色下好看，
+     换到浅色主题就变成白底浅黄字，几乎看不见。抽成变量，两套各自给。 */
+  --warn-ink: #ffd9a8;
+  --warn-ink-hi: #ffc987;
+  --warn-bg: rgba(255, 176, 74, 0.09);
+  --warn-line: rgba(255, 176, 74, 0.28);
+  --warn-solid: #e8b23a;
+  /* 品牌色只用在图标和微光上。浅色下要按 WCAG 算过的深版，
+     否则微信绿 #07C160 的对比度只有 2.14:1。 */
+  --brand-text: #1a1a1a;
+  /* 图表配色。原来写死在 charts.js 里，浅色主题下绿/橙在白底上几乎看不见 */
+  --ch-1: #5b8cff;
+  --ch-2: #3ddc97;
+  --ch-3: #f5a524;
+  --ch-4: #a06bff;
+  --ch-5: #ff7a9c;
+  --ok-ink: #b9edd0;
+  --ok-ink-hi: #8fe8b8;
+  --ok-bg: rgba(61, 220, 151, 0.08);
+  --ok-line: rgba(61, 220, 151, 0.32);
+  /* 浮层遮罩与投影：浅色下这两个数值要轻得多，否则整块发黑 */
+  --scrim: rgba(0, 0, 0, 0.52);
+  --lift: 0 30px 70px -30px rgba(0, 0, 0, 0.75);
+  --chip-solid: rgba(10, 11, 13, 0.9);
+}
+
+/* 浅色主题：不是把深色反过来，而是重新定一套。
+   底色偏冷灰（纯白在大屏上会晃眼），卡片纯白靠阴影浮起来，描边要更细。 */
+body.light {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --card-hi: #ffffff;
+  --line: rgba(16, 18, 24, 0.085);
+  --line-hi: rgba(16, 18, 24, 0.2);
+  --ink: #14161b;
+  /* 次要文字用**实色**，不用 alpha 叠加。
+     alpha 的最终颜色取决于底下是什么，卡片和底色不一样，同一个 token
+     会算出两种对比度，没法一次调准。原值是 0.4 → 对白底只有 2.53:1，
+     白底浅灰字，这就是「浅色很丑」的主因。现在两个都过 4.5:1。 */
+  --ink-2: #4b5058;
+  --ink-3: #6a6f77;
+  /* 强调色和状态色也要压深：原来的 #3d6ff0 / #16a765 / #e23c3c
+     配白字只有 4.44 / 3.16 / 4.25，按钮上的白字是虚的。 */
+  --accent: #2f5fd8;
+  --ok: #0a805a;
+  --bad: #c62828;
+
+  --grid: rgba(16, 18, 24, 0.045);
+  --chip: rgba(16, 18, 24, 0.035);
+  /* 0.012 叠在白卡片上几乎不可见，图表卡的底色会「消失」 */
+  --card-lo: #fbfcfd;
+  /* 浅色下 sheen 不能再是「白色高光」—— 白底上的白色等于没有。
+     改成一层极淡的冷灰，作用是让卡片边缘有一点玻璃感，而不是亮。 */
+  --sheen: rgba(20, 22, 27, 0.035);
+  --sheen-hi: rgba(20, 22, 27, 0.055);
+  --tint-base: rgba(16, 18, 24, 0.035);
+  --soft: rgba(16, 18, 24, 0.055);
+  --line-strong: rgba(16, 18, 24, 0.3);
+  --scroll: rgba(16, 18, 24, 0.14);
+  /* 浅色卡片靠阴影浮起来，原来 0.45 太轻，卡片像贴纸 */
+  --shadow: 0 6px 18px -10px rgba(16, 18, 24, 0.18), 0 1px 3px rgba(16, 18, 24, 0.06);
+  --halo-a: rgba(61, 111, 240, 0.1);
+  --halo-b: rgba(140, 92, 240, 0.07);
+  --sheet: rgba(255, 255, 255, 0.96);
+
+  /* 浅色下这三个「淡字」必须反过来：深棕/深绿写在浅底上，
+     原来那套 #ffd9a8 / #b9edd0 是白底白字，对比度只有 1.2:1。 */
+  --warn-ink: #7a4a00;
+  --warn-ink-hi: #633c00;
+  --warn-bg: rgba(255, 176, 74, 0.16);
+  --warn-line: rgba(190, 124, 12, 0.38);
+  --warn-solid: #a86a00;
+  --brand-text: #1a1a1a;
+  /* 浅色下压深一档：#3ddc97 在白底 1.8:1、#f5a524 1.9:1，柱子等于没画 */
+  --ch-1: #2f5fd8;
+  --ch-2: #0a805a;
+  --ch-3: #a86a00;
+  --ch-4: #7a45d0;
+  --ch-5: #c2306b;
+  --ok-ink: #0b6b42;
+  --ok-ink-hi: #075733;
+  --ok-bg: rgba(22, 167, 101, 0.11);
+  --ok-line: rgba(22, 167, 101, 0.32);
+  --scrim: rgba(16, 18, 24, 0.32);
+  --lift: 0 24px 54px -30px rgba(16, 18, 24, 0.5);
+  --chip-solid: rgba(255, 255, 255, 0.94);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------ 背景 */
+/* 细网格：只在顶部可见，往下渐隐，避免满屏格子像张坐标纸 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(130% 70% at 50% 0%, #000 20%, transparent 72%);
+  mask-image: radial-gradient(130% 70% at 50% 0%, #000 20%, transparent 72%);
+}
+
+.halo {
+  position: fixed;
+  left: -10%;
+  right: -10%;
+  top: -420px;
+  height: 760px;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 50% at 34% 60%, var(--halo-a), transparent 72%),
+    radial-gradient(34% 44% at 72% 40%, var(--halo-b), transparent 72%);
+  filter: blur(20px);
+}
+
+/* 隐藏式标题栏的拖拽区 */
+.drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  -webkit-app-region: drag;
+  z-index: 20;
+}
+
+/* ------------------------------------------------------------ 布局 */
+.wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 50px 40px 0;
+}
+
+.head { flex: 0 0 auto; }
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.eyebrow .sep { opacity: 0.45; }
+
+.led {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 22%, transparent);
+}
+
+h1 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.sub {
+  margin: 8px 0 0;
+  max-width: 620px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+
+.stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--chip);
+}
+
+.chip b {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.chip em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------ 平台宫格 */
+.grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  gap: 16px;
+  margin-top: 28px;
+  align-content: start;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+
+.card {
+  /* 品牌色有两套：深色主题用原色，浅色主题用压深的版本。
+     X 和 Threads 的品牌色接近白色，在浅色卡片上会完全隐形。
+     JS 只负责写 --b-dark / --b-light，这里决定当前该用哪套。 */
+  --brand: var(--b-dark, var(--accent));
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 104px;
+  padding: 18px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--card), var(--card-lo));
+  box-shadow: inset 0 1px 0 var(--sheen), var(--shadow);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1), border-color 0.18s, box-shadow 0.18s;
+}
+
+body.light .card {
+  --brand: var(--b-light, var(--b-dark, var(--accent)));
+}
+
+/* 悬停时顶部亮一条品牌色细线——科技感的来源是「精确」，不是「发光」 */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--brand) 40%, var(--line-hi));
+  box-shadow:
+    0 20px 40px -26px color-mix(in oklab, var(--brand) 65%, #000),
+    inset 0 1px 0 var(--sheen-hi);
+}
+
+.card:hover::before { opacity: 0.9; }
+
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tile {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--brand);
+  background: color-mix(in oklab, var(--brand) 19%, var(--tint-base));
+  border: 1px solid color-mix(in oklab, var(--brand) 38%, transparent);
+}
+
+.tile svg {
+  width: 23px;
+  height: 23px;
+  fill: currentColor;
+}
+
+.tile svg text {
+  font-family: var(--font);
+  font-weight: 600;
+}
+
+.card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: var(--ink-2);
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+.state .d {
+  flex: 0 0 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  opacity: 0.6;
+}
+
+/* 状态四态：灰=没设置 / 空心环=建好没读 / 绿=正常 / 红=要人管 */
+.state .d.ready {
+  background: transparent;
+  border: 1.4px solid var(--accent);
+  opacity: 0.9;
+}
+
+.state .d.ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(61, 220, 151, 0.14);
+  opacity: 1;
+}
+
+.state .d.login_expired,
+.state .d.fingerprint_mismatch {
+  background: var(--bad);
+  box-shadow: 0 0 0 3px rgba(255, 93, 93, 0.16);
+  opacity: 1;
+}
+
+/* 「再添加一个号」，只在悬停/聚焦时出现，避免主界面变挤 */
+.add {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--chip-solid);
+  color: var(--ink-2);
+  /* 深色是「深色块 + 亮字」，浅色必须反过来，否则白底上一个黑洞 */
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.16s, color 0.16s, border-color 0.16s;
+}
+
+.card:hover .add,
+.card:focus-within .add { opacity: 1; }
+
+.add:hover {
+  color: var(--ink);
+  border-color: var(--line-hi);
+}
+
+/* ------------------------------------------------------------ 登录面板
+ *
+ * 登录时这是一个「任务页」，不是浏览页。所以：
+ * 布局上 大标题、副标题、统计条全部让位（见 body.panel-open .head），
+ * 内容垂直居中，主按钮贴在内容下方 —— 不让人在左栏里找按钮。
+ */
+.side {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  /* safe：内容超高时退化为顶对齐，不会把「返回」挤出视口 */
+  justify-content: safe center;
+  padding: 44px 0 20px;
+  overflow-y: auto;
+}
+
+/* 返回：登录态下的唯一退路，必须一直在左上角，不随内容滚动 */
+.back {
+  position: absolute;
+  top: 2px;
+  left: -6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 10px 6px 4px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.16s, background 0.16s;
+}
+
+.back:hover { color: var(--ink); background: var(--soft); }
+
+.back .chev {
+  font-size: 17px;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+.side-top {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.side-icon {
+  --brand: var(--b-dark, var(--accent));
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--brand);
+  background: color-mix(in oklab, var(--brand) 15%, var(--tint-base));
+  border: 1px solid color-mix(in oklab, var(--brand) 30%, transparent);
+}
+
+body.light .side-icon {
+  --brand: var(--b-light, var(--b-dark, var(--accent)));
+}
+
+.side-icon svg { width: 22px; height: 22px; fill: currentColor; }
+.side-icon svg text { font-family: var(--font); font-weight: 600; }
+
+.side-id h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.side-sub {
+  margin: 3px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.side-lead {
+  margin: 22px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.75;
+}
+
+.side-lead strong { color: var(--ink); font-weight: 600; }
+
+.side-list {
+  margin: 15px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.side-list li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.side-list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+/* 提示条：只在真的遇到问题（Google 拒绝授权等）时出现，不预先占位 */
+.hint {
+  margin-top: 20px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--warn-ink);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+}
+
+.hint b { display: block; margin-bottom: 4px; color: var(--warn-ink-hi); font-weight: 600; }
+
+.hint.ok {
+  color: var(--ok-ink);
+  background: var(--ok-bg);
+  border-color: var(--ok-line);
+}
+
+.hint.ok b { color: var(--ok-ink-hi); }
+
+/* 备用通道：面板里登不进时的后路。做成一句话，不做成按钮栏，
+   因为它会让人以为「必须用 Chrome」，其实是下策。 */
+.alt {
+  margin-top: 18px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.alt .link { font-size: 11.5px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+.alt .link:hover { color: var(--accent); }
+
+.side-actions {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.side-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.side-row .btn { flex: 1 1 0; }
+
+/* ------------------------------------------------------------ 按钮 */
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.14s, background 0.16s, border-color 0.16s, color 0.16s;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn.primary {
+  border: 1px solid transparent;
+  color: #fff;
+  /* 原来的 #6d98ff 太亮，白字放上去只有 2.77:1 —— 按钮上的字看不清。
+     压到 #3a6ae4 起，白字 4.26:1，同时还是「亮色按钮」的观感。 */
+  background: linear-gradient(180deg, #3a6ae4, #2b57cc);
+  box-shadow: 0 10px 22px -14px rgba(58, 106, 228, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.btn.primary:hover { background: linear-gradient(180deg, #4a7ae8, #3462d6); }
+
+.btn.ghost {
+  border: 1px solid var(--line-hi);
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.btn.ghost:hover { color: var(--ink); border-color: var(--line-strong); }
+
+.btn.text {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.btn.text:hover { color: var(--ink-2); }
+
+/* 主按钮占满一行：登录完成是这一步的唯一终点，不该跟别的按钮平分注意力 */
+.btn.block {
+  width: 100%;
+  padding: 13px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 11px;
+}
+
+/* ------------------------------------------------------------ 页脚 */
+.foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.link {
+  font: inherit;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.16s;
+}
+
+.link:hover { color: var(--ink-2); }
+
+/* ------------------------------------------------------------ 窄窗 */
+@media (max-width: 1080px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 820px) {
+  .wrap { padding: 46px 24px 0; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+
+/* 面板打开 = 登录任务态：左栏只留「登哪个号、怎么登、登完了点这」，
+   标题、副标题、统计条在这个场景里一句都不需要，全部让位给右侧网页。
+   右边距必须等于「面板宽度 + 一段呼吸距离」—— 面板是原生视图，挡着就是挡着。 */
+body.panel-open .head { display: none; }
+body.panel-open .wrap {
+  padding: 34px calc(var(--panel-w, 620px) + 44px) 0 40px;
+}
+body.panel-open .foot { margin-top: 0; }
+
+
+/* ------------------------------------------------------------ 滚动条 */
+.grid::-webkit-scrollbar { width: 8px; }
+.grid::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border-radius: 4px;
+}
+.grid::-webkit-scrollbar-track { background: transparent; }
+
+/* ------------------------------------------------------------ 设置浮层 */
+.gear {
+  position: absolute;
+  top: 44px;
+  right: 40px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.16s, background 0.16s, border-color 0.16s;
+}
+
+.gear:hover { color: var(--ink); background: var(--soft); border-color: var(--line); }
+.gear svg { width: 18px; height: 18px; }
+
+.sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  backdrop-filter: blur(7px);
+}
+
+body.light .sheet { background: rgba(16, 18, 24, 0.34); }
+
+.sheet-card {
+  width: 470px;
+  max-width: calc(100% - 48px);
+  max-height: 78%;
+  overflow-y: auto;
+  padding: 26px;
+  border-radius: 20px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  box-shadow: var(--lift), inset 0 1px 0 var(--sheen);
+}
+
+.sheet-card h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sheet-card h3:not(:first-child) { margin-top: 24px; }
+
+.sheet-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.6;
+}
+
+.picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pick:hover { border-color: var(--line-hi); }
+
+.pick input {
+  appearance: none;
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-hi);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pick input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.pick input:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+.pick .pn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.pick input:checked ~ .pn { color: var(--ink); }
+
+.pick .pd {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-hi);
+}
+
+.pick .pd.ok { background: var(--ok); }
+.pick .pd.warn { background: var(--bad); }
+
+.seg {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--chip);
+  border: 1px solid var(--line);
+}
+
+.seg button {
+  flex: 1;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.16s, background 0.16s;
+}
+
+.seg button:hover { color: var(--ink-2); }
+
+.seg button.on {
+  color: var(--ink);
+  background: var(--card-hi);
+  box-shadow: 0 2px 10px -6px rgba(0, 0, 0, 0.6);
+}
+
+body.light .seg button.on { box-shadow: 0 2px 8px -4px rgba(16, 18, 24, 0.3); }
+
+.sheet-foot { margin-top: 26px; }
+
+/* 浅色下网格纹和光晕都收一档，否则大屏会显得脏 */
+body.light::before { opacity: 0.7; }
+body.light .halo { opacity: 0.75; }
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 56px 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--ink-3);
+}
+
+/* 登录任务态下不该分心，齿轮收起来 */
+body.panel-open .gear { display: none; }
+
+/* ==========================================================================
+   详情页 · 账号数据
+   ========================================================================== */
+
+.detail {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 30px;
+  /* 图表加进来之后内容会超过一屏，整页滚比表格内部滚好理解。
+     底部留一点空，免得最后一行贴着窗口边。 */
+  overflow-y: auto;
+  padding-bottom: 18px;
+}
+
+.detail-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.detail-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.detail-txt { min-width: 0; }
+
+.detail-txt h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.btn.sm {
+  padding: 7px 13px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+
+/* 读取进度：一个转圈 + 一句人话。不显示百分比 —— 我们并不知道还剩多久，
+   编一个百分比出来只会让人盯着它等。 */
+.dprog {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, transparent);
+}
+
+.dprog i {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: dspin 0.8s linear infinite;
+}
+
+@keyframes dspin {
+  to { transform: rotate(360deg); }
+}
+
+/* 多个号时的切换条 */
+.dtabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dtab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.dtab:hover { border-color: var(--line-hi); }
+
+.dtab.on {
+  color: var(--ink);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--card));
+}
+
+.dt-f {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+/* 四个账号级指标 */
+.dmetrics {
+  flex: 0 0 auto;
+  display: grid;
+  /* 不再写死 4 列：有的平台只给得出 2 个指标，写死 4 列会留两个空位，
+     比没有数据更让人觉得「坏了」。auto-fit 让有几张卡就铺多宽。 */
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+/* 读不到的指标：一行小字说清楚，不再摊成四个空卡 */
+.mcard.wide { grid-column: span 2; }
+
+/* 一句话结论：图上方那两行字。左边一条竖线，读起来像批注而不是正文 */
+.dinsight {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding: 9px 12px 9px 13px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--card-lo);
+}
+
+.dinsight p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.dinsight p + p {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid var(--line);
+}
+
+.dinsight b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- 图表 */
+.dcharts {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/**
+ * 图表按行分组，不再用 grid 的 auto-fit。
+ *
+ * 为什么换掉 grid：auto-fit 会先按「能放几列」定轨道数，卡片不满一行时
+ * 右边就留一块空白（4 列放 3 张 → 空 266px，4 列放 2 张 → 空 532px）。
+ * 而我们的卡片数是随平台数据变的（有的平台只有 2 张图），
+ * 那个空白看起来很扎眼，像是没渲染完。
+ *
+ * 现在每行是一个 flex 容器，卡片 `flex: 1 1 0` 均分整行宽度 ——
+ * 一行几张就平分几份，永远不会留下空位。
+ */
+.chrow {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.chrow > .chcard {
+  flex: 1 1 0;
+  /* 不加 min-width:0 的话，长标题的 min-content 会把卡片撑爆、整行溢出 */
+  min-width: 0;
+}
+
+/* 通栏的卡（趋势、四象限）自己占一行 */
+.chrow > .chcard.wide {
+  flex: 1 1 100%;
+}
+
+.chcard {
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card-lo);
+  min-width: 0;
+}
+
+.chhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chhead b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chhead i {
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.chbox { width: 100%; }
+.chbox svg { display: block; width: 100%; height: auto; }
+
+
+/* 指标切换：一小排标签，选中的那个用强调色实底 */
+.chtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.chtab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 6px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.14s, color 0.14s, border-color 0.14s;
+}
+
+.chtab:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+.chtab.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* 当前值 + 相对第一个点的变化。涨红跌绿按国内习惯 */
+.chsum {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px 2px;
+}
+
+.chsum b {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.chdelta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.chdelta.up { color: var(--bad); }
+.chdelta.down { color: var(--ok); }
+
+.chempty {
+  padding: 26px 6px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.mcard {
+  padding: 14px 16px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--card), var(--card-lo));
+  box-shadow: inset 0 1px 0 var(--sheen);
+}
+
+.mk {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.mv {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+/* 增长用平台后台的惯例色（绿），不是股票的红色 —— 这里看的是「有没有涨粉」，
+   不是买卖。大红大绿会让整屏像行情软件。 */
+.md {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--ok);
+  min-height: 17px;
+}
+
+.ms {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+/* 作品表 */
+.dtable {
+  /* 必须 flex: 0 0 auto —— 不能允许它被压缩。
+     详情页是定高 flex 列，表格一旦可收缩就会被压到二十来像素，
+     数据行因为 overflow: visible 全溢到外面，正好盖住下面的说明块，
+     看上去像「说明文字跑进了表格里」。长度由内容决定，滚动交给整个详情页。 */
+  flex: 0 0 auto;
+  min-height: 0;
+  /* 整页滚动、表格不自己滚 —— 两个滚动条套在一起，滚轮到底该滚谁是反直觉的 */
+  overflow: visible;
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card-lo);
+}
+
+.dthead,
+.drow {
+  display: grid;
+  grid-template-columns: var(--tpl, minmax(0, 1fr) 84px 68px 68px 68px);
+  align-items: center;
+  column-gap: 8px;
+}
+
+.dthead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 9px 14px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.drow {
+  padding: 10px 14px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.12s;
+}
+
+.drow:last-child { border-bottom: 0; }
+.drow:hover { background: var(--soft); }
+
+.wtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.untitled { color: var(--ink-3); font-style: normal; }
+
+.wdate {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.wnum {
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dempty {
+  padding: 54px 20px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--ink-3);
+}
+
+/* 平台说明：字段没实测过、最近一次读取失败之类，放在表格下面 */
+.dnote {
+  flex: 0 0 auto;
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.dnote p { margin: 0; }
+.dnote p + p { margin-top: 4px; }
+
+.foot-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* 提示条：浮在底部，不挡住内容。成败都要出现一次 —— 
+   点完按钮毫无反应是最让人怀疑「坏了」的。 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(760px, calc(100vw - 96px));
+  padding: 13px 18px;
+  border-radius: 13px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  background: var(--sheet);
+  border: 1px solid var(--line-hi);
+  box-shadow: var(--lift);
+  backdrop-filter: blur(12px);
+}
+
+.toast b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.toast.ok { border-color: var(--ok-line); }
+.toast.bad { border-color: var(--warn-line); }
+
+/* 面板开着时提示条会被原生视图压住：它是 position:fixed，
+   而面板是 WebContentsView，永远在网页上面。只能把提示条挤到左边那一栏里。 */
+body.panel-open .toast {
+  left: calc((100vw - var(--panel-w, 620px)) / 2);
+  max-width: calc(100vw - var(--panel-w, 620px) - 56px);
+  bottom: 24px;
+}
+
+/* 提示条里的行动按钮：读完数据后「看数据」，不点也不会消失 */
+.toastgo {
+  appearance: none;
+  margin: 9px 0 0;
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.14s;
+}
+
+.toastgo:hover { filter: brightness(1.08); }
+
+/* 详情页：抬头让位给数据。平台列表页才需要「账号监控 / 本地存储」那套说明。 */
+body.view-detail .head { display: none; }
+body.view-detail .gear { display: none; }
+body.view-detail .wrap { padding: 34px 40px 0; }
+
+/* 没有作品时表格不该撑满整屏 —— 一张大空框比一句提示更像坏了 */
+.dtable.is-empty { flex: 0 0 auto; }
+
+@media (max-width: 1000px) {
+  .dmetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
+/* ==========================================================================
+   2026-10-24 追加
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- 重叠的真正原因
+   `body.view-detail .wrap` 和 `body.panel-open .wrap` 特异性完全相同（都是 0,2,1），
+   而 view-detail 那条写在文件后面 —— 于是在「详情页里点重新登录」这个场景下，
+   panel-open 给右栏留的 padding-right 被整段覆盖掉了。
+   表现就是登录面板压在主界面上，左边的内容被原生视图盖住。
+   `body.panel-open.view-detail .wrap` 是 0,3,1，明确赢过那条，不用靠顺序。 */
+body.panel-open .wrap,
+body.panel-open.view-detail .wrap {
+  padding-right: calc(var(--panel-w, 620px) + 44px);
+}
+
+
+/* 窗口太窄时，面板会给左栏留不出空间。这时让左栏内容纵向排、允许换行，
+   宁可小一点，也不要挤成一团互相压住。 */
+@media (max-width: 980px) {
+  body.panel-open .wrap,
+  body.panel-open.view-detail .wrap {
+    padding-left: 24px;
+  }
+  body.panel-open .side { padding-top: 36px; }
+}
+
+/* ---------------------------------------------------------------- 类型角标 */
+.wtype {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-style: normal;
+  line-height: 1.5;
+  vertical-align: 1px;
+  white-space: nowrap;
+  color: var(--ink-3);
+  background: var(--chip);
+  border: 1px solid var(--line);
+}
+
+/* 回复和转发不是「我主动写的」，颜色上要退一层，别和原创同等醒目 */
+.wtype.reply,
+.wtype.repost {
+  color: var(--ink-3);
+}
+
+.wtype.quote {
+  color: var(--warn-solid);
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
+}
+
+/* ---------------------------------------------------------------- 危险按钮 */
+.btn.ghost.danger {
+  color: var(--bad);
+  border-color: color-mix(in oklab, var(--bad) 34%, transparent);
+}
+
+.btn.ghost.danger:hover {
+  background: color-mix(in oklab, var(--bad) 10%, transparent);
+  border-color: color-mix(in oklab, var(--bad) 55%, transparent);
+}
+
+/* 详情页那排按钮多了「退出登录」，窄窗口要能换行，不能挤成一条 */
+.detail-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 62%;
+}
+
+/* ---------------------------------------------------------------- 图表空位 */
+/* chSwitchable 里的画布：不设高度会让 SVG 拿到 0 宽的 clientWidth */
+.chplot { width: 100%; min-height: 118px; }
+
+/* ---------------------------------------------------------------- 返回按钮
+   `.side` 是 overflow-y: auto 的滚动容器，里面的 .back 是 absolute ——
+   内容一长它就被滚出视口了。sticky 让它一直贴在顶上。 */
+.side .back {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  align-self: flex-start;
+  padding: 6px 10px 6px 4px;
+  backdrop-filter: blur(6px);
+}
+
+/* ---------------------------------------------------------------- 指标卡窄屏
+   卡片用 minmax(150px, 1fr)，窗口一窄它照样塞 4 列，数字会叠在一起。 */
+@media (max-width: 920px) {
+  .dmetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------------------------------------------------------------- AI 接入 */
+.airow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card-lo);
+}
+
+.aiallow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.aiallow input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+.aistate { font-size: 11.5px; color: var(--ink-3); }
+
+.aibox {
+  margin-top: 10px;
+  padding: 12px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card-lo);
+}
+
+.aikey,
+.aiurl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ailabel {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--ink-3);
+  min-width: 30px;
+}
+
+.aikey code,
+.aiurl code {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--chip);
+  border: 1px solid var(--line);
+  /* 密钥很长，必须能换行，不能撑破弹层 */
+  word-break: break-all;
+}
+
+.aiconf {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  background: var(--chip);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 150px;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------------- 作品类型筛选
+   X 的「作品」混着原创、转发、回复，各看各的指标。分开之后每一类有自己的条数。 */
+.dwtabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 8px;
+}
+
+.dwt {
+  appearance: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background-color 0.14s;
+}
+
+.dwt:hover { color: var(--ink); border-color: var(--ink-3); }
+
+.dwt b {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  /* 数字用等宽，切换类型时不会左右跳 */
+  font-variant-numeric: tabular-nums;
+}
+
+.dwt.on {
+  color: var(--ink);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.dwt.on b { color: var(--accent); }
+
+/* ---------------------------------------------------------------- 重点指标卡
+   每个平台的核心指标不一样（公众号看分享、B站看投币、视频号看完播），
+   给它一个淡淡的强调，让人一眼知道「这张是要看的」。 */
+.mcard.focus {
+  border-color: color-mix(in oklab, var(--accent) 34%, transparent);
+  background: color-mix(in oklab, var(--accent) 5%, var(--card-lo));
+}
+
+.mfoc {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.6;
+  vertical-align: 1px;
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+.mcard .mv small {
+  margin-left: 2px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* 结论块里的「为什么看这个」，比结论本身弱一级 */
+.chwhy {
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------- 导出面板 */
+.exseg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.exseg button {
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 64px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background-color 0.14s;
+}
+
+.exseg button:hover { color: var(--ink); border-color: var(--ink-3); }
+
+.exseg button.on {
+  color: var(--ink);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  font-weight: 600;
+}
+
+.exhint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  min-height: 18px;
+}
+
+/* 平台范围：等宽小 chip，一眼看全 8 个平台 */
+.exseg.expat button {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 11.5px;
+}
+
+.exsplit {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.exsplit input {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.exsplit em {
+  font-style: normal;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+/* 账号多选：小字、密排，一屏能看全 13 个号 */.expick {
+  max-height: 190px;
+  overflow-y: auto;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.expickrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+.expickrow:last-child { border-bottom: 0; }
+.expickrow:hover { background: var(--chip); }
+
+.expickrow input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.explat {
+  flex: 0 0 auto;
+  min-width: 58px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.exname {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exnum {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tosmall {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------------- 每日自动更新 */
+.dailyrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dailyrow input[type='time'] {
+  appearance: none;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line-hi);
+  background: var(--card-lo);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dailyrow input[type='time']::-webkit-calendar-picker-indicator {
+  /* 深色主题下系统图标是黑的，看不见；反色一下 */
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
+body.light .dailyrow input[type='time']::-webkit-calendar-picker-indicator {
+  filter: none;
+}

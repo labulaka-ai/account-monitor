@@ -1,0 +1,34 @@
+# 运行环境（每个开发者自己装）
+node_modules/
+
+# 打包产物：.app 里有 292MB 二进制，dmg/zip 走 Release 附件，
+# 不进仓库（GitHub 单文件上限也就 100MB，推不上去）
+dist/
+release/
+*.dmg
+*.zip
+*.blockmap
+
+# 本地数据库与备份：里面是真实账号数据，绝不入库
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# 迁移前自动备份、诊断导出（诊断文件里有平台页面原文）
+backups/
+diag/
+
+# 界面截图：上面有真实昵称和数字，只留在本机
+screenshots/
+
+# 系统垃圾
+.DS_Store
+*.log
+
+# 本地 AI 协作记录，不进公开仓库
+.workbuddy/
+
+# 打包时个人数据的临时挪移目录
+_personal-backup-*
+_personal-backup-latest.txt

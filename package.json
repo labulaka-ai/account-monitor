@@ -1,0 +1,116 @@
+{
+  "name": "account-monitor",
+  "version": "0.1.0",
+  "description": "多平台账号数据留底工具 · 全部本地运行 · 一个号一个环境",
+  "author": "labulaka-ai",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/labulaka-ai/account-monitor.git"
+  },
+  "homepage": "https://github.com/labulaka-ai/account-monitor",
+  "bugs": {
+    "url": "https://github.com/labulaka-ai/account-monitor/issues"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js",
+    "check:pack": "node scripts/clean-personal.cjs",
+    "clean:personal": "node scripts/clean-personal.cjs --move",
+    "restore:personal": "node scripts/clean-personal.cjs --restore",
+    "pack": "npm run check:pack && electron-builder --dir",
+    "dist": "npm run check:pack && electron-builder",
+    "dist:mac": "npm run check:pack && electron-builder --mac",
+    "dist:win": "npm run check:pack && electron-builder --win",
+    "dist:linux": "npm run check:pack && electron-builder --linux"
+  },
+  "build": {
+    "appId": "local.account-monitor",
+    "productName": "账号监控",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "ui/**/*",
+      "lib/**/*",
+      "mcp/**/*",
+      "!data/**/*",
+      "!screenshots/**/*",
+      "!test/**/*",
+      "!scripts/**/*",
+      "!dist/**/*",
+      "!**/*.md",
+      "!**/.DS_Store",
+      "!**/.workbuddy/**/*"
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "账号监控",
+      "contents": [
+        {
+          "x": 140,
+          "y": 200
+        },
+        {
+          "x": 380,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "账号监控"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility"
+    }
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "^25.1.8"
+  },
+  "private": true
+}
