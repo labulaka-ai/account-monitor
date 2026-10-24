@@ -31,7 +31,8 @@ let currentPlat = null;
  */
 const PREF_KEY = 'aml.prefs';
 const prefs = Object.assign(
-  { theme: 'dark', hidden: [] },
+  // onboard: '' 还没处理 / 'done' 知道了 / 'never' 不再显示
+  { theme: 'dark', hidden: [], onboard: '' },
   (() => {
     try {
       return JSON.parse(localStorage.getItem(PREF_KEY)) || {};
@@ -120,7 +121,8 @@ let footResetTimer = 0;
 
 function stateText(p) {
   if (p.status === 'none') return '未设置';
-  if (p.status === 'login_expired') return '登录已失效，需要重新登录';
+  // 卡片右下角已经给了「重新登录」按钮，这里就不必再重复一遍
+  if (p.status === 'login_expired') return '登录已失效';
   if (p.status === 'unknown') return '还没登录';
   if (p.status === 'fingerprint_mismatch') return '账号不符，已停止写入';
 
@@ -186,7 +188,15 @@ function renderGrid() {
         <span class="state"><i class="d ${p.status}"></i>${stateText(p)}</span>
       </span>
       ${
-        p.count > 0
+        p.status === 'login_expired'
+          ? (() => {
+              // 过期的是哪个号，就重登哪个号 —— 别让用户重新猜一遍
+              const bad = (p.accounts || []).find((a) => a.status === 'login_expired');
+              return `<button class="relogin" data-relogin="${p.plat}" data-slug="${
+                (bad && bad.slug) || ''
+              }" title="打开面板重新登录">重新登录</button>`;
+            })()
+          : p.count > 0
           ? `<button class="add" data-add="${p.plat}" title="再添加一个号（独立环境）">＋</button>`
           : ''
       }
@@ -206,6 +216,24 @@ function renderGrid() {
   // 统计按「真实登录」算，不按「建过环境」算：建过但没登的号用不了，不该算进来
   $('stReady').textContent = list.filter((p) => p.status === 'ok').length;
   $('stTodo').textContent = list.filter((p) => p.status !== 'ok').length;
+
+  renderOnboard(list);
+}
+
+/**
+ * 第一次打开的三步引导。
+ *
+ * 只在一个号都没登录成的时候出现 —— 登进去任意一个之后自动消失，
+ * 不用用户再回来关一遍（那是最招人烦的引导）。
+ * 「知道了」和「✕」都记在本地偏好里，不上传、不入库。
+ */
+function renderOnboard(list) {
+  const box = $('onboard');
+  if (!box) return;
+  const settled = prefs.onboard === 'done' || prefs.onboard === 'never';
+  const anyReady = list.some((p) => p.status === 'ok');
+  // 一个平台都没勾时，「一个平台都没选」那句话比三步引导更该出现
+  box.hidden = settled || anyReady || !list.length;
 }
 
 // ---------------------------------------------------------------- 项目主页 / Star
@@ -451,6 +479,12 @@ function bindToastActions() {
     const b = e.target.closest('.toastgo');
     if (!b) return;
     el.hidden = true;
+    // 诊断包：不是「跳到哪」，而是「做一件事」，所以先看 data-act
+    const act = b.dataset.act;
+    if (act === 'diagpack') {
+      packDiag();
+      return;
+    }
     const plat = b.dataset.go;
     const acc = b.dataset.acc;
     if (plat) openDetail(plat, acc || undefined);
@@ -1394,7 +1428,39 @@ function showDiag() {
     `接口响应 ${d.interfaceCount || 0} 个`,
     d.loadErr ? `页面报错：${esc(d.loadErr)}` : ''
   ].filter(Boolean);
-  toast(lines.join('<br />'), 'bad');
+  toast(
+    lines.join('<br />') +
+      '<div class="toast-acts"><button class="toastgo" data-act="diagpack" type="button">打包诊断（已脱敏）</button></div>',
+    'bad',
+    { sticky: true }
+  );
+}
+
+/**
+ * 打包诊断。
+ *
+ * 诊断原文里有昵称、handle、本机路径 —— 直接让人贴出来等于公开账号。
+ * 所以这个按钮做的是「先脱敏再打包」，包里只有字段结构和平台返回的形状。
+ * 打完在访达里选中，用户拖着发出去就行，不用找路径。
+ */
+async function packDiag() {
+  toast('正在打包诊断…', 'ok');
+  try {
+    const r = await window.api.diagPack('');
+    if (!r.ok) {
+      toast('打包失败：' + esc(r.error || '未知原因'), 'bad');
+      return;
+    }
+    const kb = Math.max(1, Math.round(r.size / 1024));
+    toast(
+      `诊断包已生成（${r.count} 个文件，${kb} KB），已在访达里选中。<br />` +
+        '昵称、handle、头像、uid 都换成了「已隐藏 · N 字」，本机路径也替换过了 —— 建议发出去前自己解压看一眼。',
+      'ok',
+      { sticky: true }
+    );
+  } catch (err) {
+    toast('打包失败：' + esc(err.message), 'bad');
+  }
 }
 
 // ---------------------------------------------------------------- 面板
@@ -1732,6 +1798,13 @@ async function boot() {
       openPlatform(add.dataset.add, { newAccount: true });
       return;
     }
+    // 登录过期不该只剩一个小圆点：卡片上直接给「重新登录」，少一次点击
+    const relogin = e.target.closest('.relogin');
+    if (relogin) {
+      e.stopPropagation();
+      openPlatform(relogin.dataset.relogin, { slug: relogin.dataset.slug || undefined });
+      return;
+    }
     const card = e.target.closest('.card');
     if (card) openCard(card.dataset.plat);
   });
@@ -1744,6 +1817,15 @@ async function boot() {
     e.preventDefault();
     openCard(card.dataset.plat);
   });
+
+  // 首次引导的两个出口。都写本地偏好：'done' 之后不再提，'never' 永不再提
+  const settleOnboard = (how) => {
+    prefs.onboard = how;
+    savePrefs();
+    renderOnboard(shownPlats());
+  };
+  $('obOk').addEventListener('click', () => settleOnboard('done'));
+  $('obNever').addEventListener('click', () => settleOnboard('never'));
 
   // ------------------------------------------------------------ 详情页
   $('btnBackGrid').addEventListener('click', async () => {
@@ -1881,6 +1963,44 @@ async function boot() {
   // ---------------------------------------------------------- 关于 / Star
   $('btnRepo').addEventListener('click', openRepo);
   $('btnStar').addEventListener('click', openRepo);
+
+  // 检查更新：点了才联网。这工具对外承诺「断网也能用」，所以不挂定时器、不偷偷请求
+  let updateUrl = '';
+  $('btnCheckUpdate').addEventListener('click', async () => {
+    const btn = $('btnCheckUpdate');
+    const msg = $('updateMsg');
+    updateUrl = '';
+    btn.disabled = true;
+    btn.textContent = '检查中…';
+    msg.textContent = '';
+    msg.classList.remove('up-new');
+    try {
+      const r = await window.api.checkUpdate(true);
+      if (!r.ok) {
+        // 连不上 GitHub 是常事，不该红着脸报错
+        msg.textContent = '检查失败，稍后再试';
+        msg.title = r.error || '';
+      } else if (r.noRelease) {
+        msg.textContent = '还没有发布版本';
+      } else if (r.hasUpdate) {
+        msg.textContent = `有新版本 v${r.latest}`;
+        msg.classList.add('up-new');
+        updateUrl = r.url || '';
+        msg.title = '点击打开下载页';
+      } else {
+        msg.textContent = '已是最新';
+      }
+    } catch (err) {
+      msg.textContent = '检查失败，稍后再试';
+      msg.title = err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '检查更新';
+    }
+  });
+  $('updateMsg').addEventListener('click', () => {
+    if (updateUrl) window.api.openExternal(updateUrl);
+  });
   $('nudgeGo').addEventListener('click', () => {
     openRepo();
     markStar('clicked');

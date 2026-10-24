@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   info: () => ipcRenderer.invoke('app:info'),
+  checkUpdate: (force) => ipcRenderer.invoke('app:checkUpdate', force),
   listPlats: () => ipcRenderer.invoke('plats:list'),
   openPanel: (plat, opts) => ipcRenderer.invoke('panel:open', plat, opts || {}),
   /** 给同一个平台再开一个全新的隔离环境（第二个号） */
@@ -25,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   syncPlat: (plat) => ipcRenderer.invoke('plat:syncAll', plat),
   exportAccount: (id, format) => ipcRenderer.invoke('account:export', id, format),
   diagOpen: () => ipcRenderer.invoke('diag:open'),
+  diagPack: (note) => ipcRenderer.invoke('diag:pack', note),
   /**
    * 退出登录：清掉这个号专属分区的登录态。
    * 不依赖平台页面上的退出按钮 —— 那些经常点不动或被弹窗卡死。

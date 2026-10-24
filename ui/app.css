@@ -1949,3 +1949,136 @@ body.light .dailyrow input[type='time']::-webkit-calendar-picker-indicator {
 
 /* 面板是原生视图，永远压在网页上面：开着面板时别让它露半截 */
 body.panel-open .nudge { display: none; }
+
+/* ==========================================================================
+   第一次使用的三步引导
+   新人打开看到 12 张「待登录」的卡，不知道下一步该干什么 —— 这段就是那句说明。
+   登进去任意一个号之后自动消失，不用回来关。
+   ========================================================================== */
+
+.onboard {
+  margin: 0 0 16px;
+  padding: 17px 20px 15px;
+  border-radius: 16px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+}
+
+.ob-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ob-head b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ob-x {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ob-x:hover { color: var(--ink); background: var(--soft); }
+
+.ob-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 22px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-steps li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 3px 9px;
+}
+
+.ob-n {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--halo-a);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ob-t {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ob-d {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.ob-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 13px;
+}
+
+/* 面板一开，左栏就窄了：三步横排会挤成豆腐块，改成竖着说 */
+@media (max-width: 760px) {
+  .ob-steps { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+
+/* 登录过期时卡片右下角常驻的入口。
+   和「＋」不同，这个必须一直看得见 —— 它是件需要人处理的事，不适合等着 hover 才露出。 */
+.relogin {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 9px 4px;
+  border: 1px solid color-mix(in oklab, var(--bad) 45%, transparent);
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--bad) 12%, transparent);
+  color: var(--bad);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.relogin:hover {
+  background: color-mix(in oklab, var(--bad) 22%, transparent);
+  border-color: color-mix(in oklab, var(--bad) 65%, transparent);
+}
+
+/* 有新版本时这句话本身就是链接：点开下载页 */
+.aboutver.up-new {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aboutver.up-new:hover { text-decoration: underline; }
+
+/* 提示条里的按钮组：诊断结果里那个「打包诊断」 */
+.toast-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}

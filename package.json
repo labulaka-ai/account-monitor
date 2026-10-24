@@ -16,7 +16,7 @@
   "scripts": {
     "start": "electron .",
     "icon": "electron scripts/make-icon.cjs",
-    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js && node --no-warnings test/scripts.test.js",
+    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js && node --no-warnings test/scripts.test.js && node --no-warnings test/maintain.test.js && node --no-warnings test/diag_pack.test.js",
     "check:pack": "node scripts/clean-personal.cjs",
     "clean:personal": "node scripts/clean-personal.cjs --move",
     "restore:personal": "node scripts/clean-personal.cjs --restore",

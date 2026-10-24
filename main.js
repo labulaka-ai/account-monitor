@@ -22,6 +22,8 @@ const platProfile = require('./lib/plat_profile');
 const export2 = require('./lib/export2');
 const reportLib = require('./lib/report');
 const { createScheduler } = require('./lib/scheduler');
+const update = require('./lib/update');
+const diagPack = require('./lib/diag_pack');
 
 /** BFS 遍历，只给自测通道用（找字段落在哪个接口） */
 function extractWalk(root, visit) {
@@ -759,6 +761,14 @@ function wireIpc() {
   }));
 
   ipcMain.handle('plats:list', () => platSnapshot());
+
+  /**
+   * 检查新版本。只由界面上的按钮触发，不挂定时器 ——
+   * 这个工具承诺「断网也能用、不上传任何数据」，开机偷偷敲一次 GitHub 会破坏那句话。
+   */
+  ipcMain.handle('app:checkUpdate', (_e, force) =>
+    update.check({ current: app.getVersion(), force: !!force })
+  );
 
   ipcMain.handle('panel:open', async (_e, plat, opts) => {
     await openPanel(plat, opts || {});
@@ -1591,6 +1601,51 @@ function wireIpc() {
     return { ok: true };
   });
 
+  /**
+   * 打一个脱敏诊断包。
+   * 公开之后收 bug 报告，没有这个就只能靠用户复述「我点了刷新然后没反应」。
+   * 脱敏在 lib/diag_pack.js 里做，包落到 exports/ 并直接选中，用户拖进对话即可。
+   */
+  ipcMain.handle('diag:pack', (_e, note) => {
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const outPath = path.join(EXPORT_DIR, `诊断包-${stamp}.zip`);
+      /**
+       * 把库里的真实昵称 / handle / uid 一起交给脱敏。
+       * 只按字段名过滤是不够的：平台把身份塞在 title 和 url 里，
+       * 实测漏过 "拉布拉卡 (@ruixue258) / X" 和 "tiktok.com/@hanruixue3"。
+       */
+      let identities = [];
+      try {
+        identities = database
+          .prepare('SELECT nickname, handle, uid FROM accounts')
+          .all()
+          .flatMap((a) => [a.nickname, a.handle, a.uid])
+          .filter(Boolean);
+      } catch {
+        /* 库还没建好也要能打包 */
+      }
+      const r = diagPack.build({
+        diagDir: DIAG_DIR,
+        outPath,
+        identities,
+        note: typeof note === 'string' ? note : '',
+        env: {
+          version: app.getVersion(),
+          platform: process.platform,
+          arch: process.arch,
+          electron: process.versions.electron,
+          chrome: process.versions.chrome,
+          node: process.versions.node
+        }
+      });
+      shell.showItemInFolder(r.file);
+      return { ok: true, ...r };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('panel:reload', () => {
     if (panel) panel.webContents.reload();
     return { ok: true };
@@ -1988,6 +2043,21 @@ app.whenReady().then(async () => {
   createWindow();
   startDevBridge();
   startDailySync();
+  // 数据库日常维护：清掉半年前的读数日志，碎片多了再 VACUUM。
+  // 推迟 8 秒 —— 启动时最不该抢的就是磁盘 IO，界面先出来要紧。
+  setTimeout(() => {
+    try {
+      const r = db.maintain(database);
+      if (r.deleted) {
+        console.log(
+          `数据库维护：清理 ${r.deleted} 条旧读数日志` +
+            (r.vacuumed ? `，整理碎片约 ${Math.round(r.freedBytes / 1024)}KB` : '')
+        );
+      }
+    } catch (err) {
+      console.warn('数据库维护失败：', err.message);
+    }
+  }, 8000);
   // AI 接入：默认不开。用户在设置里打开之后才有监听端口
   await startAiApiIfEnabled();
 

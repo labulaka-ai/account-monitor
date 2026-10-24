@@ -113,6 +113,10 @@
         </button>
         <span class="aboutver" id="aboutVer">v—</span>
       </div>
+      <div class="aboutrow">
+        <button id="btnCheckUpdate" class="btn ghost sm" type="button">检查更新</button>
+        <span class="aboutver" id="updateMsg" aria-live="polite"></span>
+      </div>
 
       <div class="sheet-foot">
         <button id="btnCloseSettings" class="btn primary block" type="button">完成</button>
@@ -161,6 +165,33 @@
       </div>
     </div>
   </div>
+
+  <section id="onboard" class="onboard" hidden aria-label="第一次使用">
+    <div class="ob-head">
+      <b>第一次用，三步就够</b>
+      <button id="obNever" class="ob-x" type="button" title="以后不再显示">✕</button>
+    </div>
+    <ol class="ob-steps">
+      <li>
+        <span class="ob-n">1</span>
+        <span class="ob-t">点一个平台卡片</span>
+        <span class="ob-d">选你已经在运营的平台，加号可以给同一个平台再开一个号。</span>
+      </li>
+      <li>
+        <span class="ob-n">2</span>
+        <span class="ob-t">在右边自己登录</span>
+        <span class="ob-d">右侧会打开该平台的后台。登录只由你本人完成，我们不碰密码。</span>
+      </li>
+      <li>
+        <span class="ob-n">3</span>
+        <span class="ob-t">回来点「刷新数据」</span>
+        <span class="ob-d">读一次之后，这里就会开始留底。之后每天早上自动读一次。</span>
+      </li>
+    </ol>
+    <div class="ob-foot">
+      <button id="obOk" class="btn primary" type="button">知道了</button>
+    </div>
+  </section>
 
   <main id="grid" class="grid" aria-label="平台列表"></main>
 
