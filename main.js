@@ -4,6 +4,26 @@
  *
  * 界面在主窗口里，平台后台用 WebContentsView 嵌在右侧面板 —— 不弹外面的窗口。
  * 每个平台一个 persist:acct-<slug> 分区：Cookie、缓存、IndexedDB 完全隔离，不串号。
+ *
+ * 文件地图（按出现顺序，方便直接跳）：
+ *
+ *   路径与常量     DATA_DIR / DB_PATH / DIAG_DIR / EXPORT_DIR / PANEL_W
+ *   串行与工具     queueSync（读数全局排队）/ partitionOf / slugOf
+ *   分区管理       migrateLegacyPartitions / adoptOrphanPartitions
+ *   读数           syncOne / syncQueued / describeResult / saveDiag / applyIdentity
+ *   平台快照       platSnapshot / aggStatus（卡片上那行状态就是它给的）
+ *   窗口与面板     createWindow / openPanel / closePanel / layoutPanel / refreshAuthStatus
+ *   IPC             wireIpc（29 个 handler，按「应用 → 平台 → 面板 → 账号 → 数据 →
+ *                   导出 → 诊断 → AI → 调度」的顺序排，不按字母排）
+ *   自测通道       runDevCmd / startDevBridge（data/*.txt，只在非打包时挂）
+ *   调度与 AI      startDailySync / createAiService（后者在 lib/ai_service.js）
+ *   启动           app.whenReady（顺序：库 → 适配器 → 读数器 → 分区 → IPC → 窗口）
+ *
+ * 拆出去的几块别在这里找：
+ *   lib/platforms/    各平台取数脚本（一个平台一个文件）
+ *   lib/ai_service.js 本机 AI 接口的生命周期
+ *   lib/diag_pack.js  诊断包与脱敏
+ *   lib/update.js     版本检查
  */
 
 const { app, BrowserWindow, WebContentsView, ipcMain, session, shell } = require('electron');
@@ -24,6 +44,7 @@ const reportLib = require('./lib/report');
 const { createScheduler } = require('./lib/scheduler');
 const update = require('./lib/update');
 const diagPack = require('./lib/diag_pack');
+const { createAiService } = require('./lib/ai_service');
 
 /** BFS 遍历，只给自测通道用（找字段落在哪个接口） */
 function extractWalk(root, visit) {
@@ -1394,18 +1415,21 @@ function wireIpc() {
    * 开关状态落在 data/ai.json，密钥落在 data/ai-token.txt（权限 600）。
    * 关掉的时候会真的把端口关掉，不是「关了但还能连」。
    */
-  ipcMain.handle('ai:status', () => ({
-    ok: true,
-    ...localApi.readState(DATA_DIR),
-    running: !!aiServer,
-    url: aiInfo.url || `http://127.0.0.1:${localApi.readState(DATA_DIR).port || localApi.PORT_DEFAULT}`,
-    token: aiInfo.token || localApi.ensureToken(DATA_DIR),
-    tokenFile: localApi.tokenPath(DATA_DIR),
-    // MCP 脚本的绝对路径：用户要把它抄进 AI 客户端的配置里，
-    // 相对路径在他那边是无效的
-    serverPath: path.join(__dirname, 'mcp', 'server.js'),
-    error: aiInfo.error || ''
-  }));
+  ipcMain.handle('ai:status', () => {
+    const ai = aiService ? aiService.state() : { enabled: false, port: 0, token: '' };
+    return {
+      ok: true,
+      ...localApi.readState(DATA_DIR),
+      running: aiService ? aiService.running() : false,
+      url: ai.url || `http://127.0.0.1:${localApi.readState(DATA_DIR).port || localApi.PORT_DEFAULT}`,
+      token: ai.token || localApi.ensureToken(DATA_DIR),
+      tokenFile: localApi.tokenPath(DATA_DIR),
+      // MCP 脚本的绝对路径：用户要把它抄进 AI 客户端的配置里，
+      // 相对路径在他那边是无效的
+      serverPath: path.join(__dirname, 'mcp', 'server.js'),
+      error: ai.error || ''
+    };
+  });
 
   ipcMain.handle('ai:toggle', async (_e, on) => {
     const st = localApi.readState(DATA_DIR);
@@ -1413,19 +1437,19 @@ function wireIpc() {
     if (!st.port) st.port = localApi.PORT_DEFAULT;
     st.createdAt = st.createdAt || new Date().toISOString();
     localApi.writeState(DATA_DIR, st);
-    await stopAiApi();
-    if (st.enabled) await startAiApiIfEnabled();
-    else aiInfo = { enabled: false, port: 0, token: '' };
+    await aiService.stop();
+    if (st.enabled) await aiService.start();
+    const ai = aiService.state();
     return {
-      ok: !aiInfo.error,
+      ok: !ai.error,
       enabled: st.enabled,
-      running: !!aiServer,
+      running: aiService.running(),
       port: st.port,
       url: st.enabled ? `http://127.0.0.1:${st.port}` : '',
       token: localApi.ensureToken(DATA_DIR),
       tokenFile: localApi.tokenPath(DATA_DIR),
       serverPath: path.join(__dirname, 'mcp', 'server.js'),
-      error: aiInfo.error || ''
+      error: ai.error || ''
     };
   });
 
@@ -1438,9 +1462,9 @@ function wireIpc() {
       /* 不存在就算了 */
     }
     const token = localApi.ensureToken(DATA_DIR);
-    if (aiServer) {
-      await stopAiApi();
-      await startAiApiIfEnabled();
+    if (aiService.running()) {
+      await aiService.stop();
+      await aiService.start();
     }
     return { ok: true, token };
   });
@@ -2059,7 +2083,18 @@ app.whenReady().then(async () => {
     }
   }, 8000);
   // AI 接入：默认不开。用户在设置里打开之后才有监听端口
-  await startAiApiIfEnabled();
+  aiService = createAiService({
+    dataDir: DATA_DIR,
+    exportDir: EXPORT_DIR,
+    database,
+    version: () => app.getVersion(),
+    accountsOf,
+    syncQueued,
+    describeResult,
+    emit,
+    platSnapshot
+  });
+  await aiService.start();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -2078,8 +2113,7 @@ app.whenReady().then(async () => {
 /** 每日自动更新的调度器（lib/scheduler.js） */
 let daily = null;
 
-let aiServer = null;
-let aiInfo = { enabled: false, port: 0, token: '' };
+let aiService = null;
 
 /**
  * 每日自动更新的用户设置。
@@ -2159,79 +2193,6 @@ function startDailySync() {
   console.log(`每日自动更新：${p.hour}:${String(p.minute).padStart(2, '0')}（模式 ${r.mode}）`);
 }
 
-function aiDeps() {
-  const view = aiView.makeView(database);
-  return {
-    version: () => app.getVersion(),
-    accounts: () => view.accounts(),
-    accountDetail: (id, opts) => view.accountDetail(id, opts),
-    works: (o) => view.works(o),
-    summary: () => view.summary(),
-    trends: (id, m) => view.trends(id, m),
-    getSettings: () => view.getSettings(),
-    setSettings: (o) => {
-      const r = view.setSettings(o);
-      emit('plats:update', platSnapshot());
-      return r;
-    },
-    async sync(input) {
-      // 指定账号：只读那一个
-      if (input && input.accountId) {
-        const res = await syncQueued(String(input.accountId), { trigger: 'manual' });
-        return { accountId: input.accountId, result: res.result, message: describeResult(res) };
-      }
-      // 指定平台：把这个平台下的号依次读完（不并行，避免同时开太多页面）
-      if (input && input.plat) {
-        const list = accountsOf(String(input.plat));
-        if (!list.length) throw new Error(`没有「${input.plat}」的账号`);
-        const out = [];
-        for (const a of list) {
-          const res = await syncQueued(a.id, { trigger: 'manual' });
-          out.push({ accountId: a.id, result: res.result, message: describeResult(res) });
-        }
-        return { plat: input.plat, results: out };
-      }
-      throw new Error('要指定 accountId 或 plat');
-    },
-    exportCsv(accountId) {
-      if (!accountId) throw new Error('要指定 accountId');
-      const file = exporter.exportAccount(database, accountId, 'csv', EXPORT_DIR);
-      return { file };
-    }
-  };
-}
-
-async function startAiApiIfEnabled() {
-  const st = localApi.readState(DATA_DIR);
-  if (!st.enabled) {
-    aiInfo = { enabled: false, port: 0, token: '', tokenFile: localApi.tokenPath(DATA_DIR) };
-    return aiInfo;
-  }
-  try {
-    const r = await localApi.start({ dataDir: DATA_DIR, port: st.port, deps: aiDeps() });
-    aiServer = r.server;
-    aiInfo = {
-      enabled: true,
-      port: r.port,
-      token: r.token,
-      tokenFile: localApi.tokenPath(DATA_DIR),
-      url: `http://127.0.0.1:${r.port}`
-    };
-    console.log(`AI 接口已启动：${aiInfo.url}（只监听本机）`);
-  } catch (err) {
-    aiInfo = { enabled: false, port: 0, token: '', error: err.message };
-    console.warn('AI 接口启动失败：', err.message);
-  }
-  return aiInfo;
-}
-
-async function stopAiApi() {
-  if (aiServer) {
-    await new Promise((r) => aiServer.close(() => r()));
-    aiServer = null;
-  }
-  aiInfo = { enabled: false, port: 0, token: '' };
-}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -2242,13 +2203,10 @@ app.on('before-quit', () => {
     daily.stop();
     daily = null;
   }
-  if (aiServer) {
-    try {
-      aiServer.close();
-    } catch {
-      /* 已经关了 */
-    }
-    aiServer = null;
+  if (aiService) {
+    // before-quit 不能挂起等 await，stop() 内部会立即 close 释放端口
+    aiService.stop().catch(() => {});
+    aiService = null;
   }
   if (database) {
     try {
