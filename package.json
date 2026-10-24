@@ -15,7 +15,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js",
+    "icon": "electron scripts/make-icon.cjs",
+    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js && node --no-warnings test/scripts.test.js",
     "check:pack": "node scripts/clean-personal.cjs",
     "clean:personal": "node scripts/clean-personal.cjs --move",
     "restore:personal": "node scripts/clean-personal.cjs --restore",
@@ -78,7 +79,8 @@
           "type": "link",
           "path": "/Applications"
         }
-      ]
+      ],
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "target": [
