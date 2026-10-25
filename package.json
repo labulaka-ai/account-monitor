@@ -1,6 +1,6 @@
 {
   "name": "account-monitor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "多平台账号数据留底工具 · 全部本地运行 · 一个号一个环境",
   "author": "labulaka-ai",
   "license": "PolyForm-Noncommercial-1.0.0",
