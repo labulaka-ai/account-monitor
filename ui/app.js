@@ -79,15 +79,21 @@ function fmt(n) {
   if (n === null || n === undefined || n === '') return '—';
   const v = Number(n);
   if (!Number.isFinite(v)) return '—';
-  if (v >= 1e8) {
-    const x = v / 1e8;
-    return (x >= 10 ? Math.round(x) : x.toFixed(1).replace(/\.0$/, '')) + '亿';
+  const a = Math.abs(v);
+  const sign = v < 0 ? '−' : '';
+  /** 不到 10 留一位小数（1.2万），10 以上取整（12万） */
+  const num = (x) => (x >= 10 ? String(Math.round(x)) : x.toFixed(1).replace(/\.0$/, ''));
+  if (a >= 1e8) return sign + num(a / 1e8) + '亿';
+  if (a >= 1e4) {
+    /**
+     * 四舍五入会**跨档**：99,999,999 / 1e4 = 9999.9999，取整成 10000，
+     * 拼上单位就成了「10000万」。数字没错、看着荒谬，而且这种数偏偏出现在
+     * 「快到一个亿」的账号上，最容易被截图。跨档就升到「亿」。
+     */
+    if (Math.round(a / 1e4) >= 1e4) return sign + num(a / 1e8) + '亿';
+    return sign + num(a / 1e4) + '万';
   }
-  if (v >= 1e4) {
-    const x = v / 1e4;
-    return (x >= 10 ? Math.round(x) : x.toFixed(1).replace(/\.0$/, '')) + '万';
-  }
-  return v.toLocaleString('en-US');
+  return sign + a.toLocaleString('en-US');
 }
 
 /** 和上一次比，涨了多少。没有可比的数据就返回空串，不印「0」。 */
@@ -179,13 +185,13 @@ function renderGrid() {
         (p) => `
     <div class="card" role="button" tabindex="0" data-plat="${p.plat}"
          data-brand="${p.brand}" data-brand-light="${p.brandLight || p.brand}"
-         title="${p.notes || ''}">
+         title="${esc(p.notes || '')}">
       <span class="tile">${svgOf(p.icon)}</span>
       <span class="card-body">
-        <span class="name">${p.plat}${
+        <span class="name">${esc(p.plat)}${
           p.count > 1 ? `<span class="badge">${p.count} 个号</span>` : ''
         }</span>
-        <span class="state"><i class="d ${p.status}"></i>${stateText(p)}</span>
+        <span class="state"><i class="d ${p.status}"></i>${esc(stateText(p))}</span>
       </span>
       ${
         p.status === 'login_expired'
@@ -233,7 +239,27 @@ function renderOnboard(list) {
   const settled = prefs.onboard === 'done' || prefs.onboard === 'never';
   const anyReady = list.some((p) => p.status === 'ok');
   // 一个平台都没勾时，「一个平台都没选」那句话比三步引导更该出现
-  box.hidden = settled || anyReady || !list.length;
+  const show = !(settled || anyReady || !list.length);
+  const wasHidden = box.hidden;
+  box.hidden = !show;
+  /**
+   * 引导条从「藏」变「显」的同一帧，网格可用高度突然少掉 ~180px。
+   * Chromium 的滚动锚定会为了「保持原来看见的内容」把 scrollTop 往下推，
+   * 结果第一次打开时最上面那行（公众号 / 小红书 / 抖音）正好被推出视野 ——
+   * 交付到别人手上，一进来就像是少了三个平台。
+   *
+   * 只在「由藏变显」这一刻压回顶部，日常刷新数据不会打断用户已经滚到的位置。
+   * 下一次动画帧再压一次：高度变化引发的锚定调整发生在本次帧之后。
+   */
+  if (show && wasHidden) {
+    const grid = $('grid');
+    if (grid) {
+      grid.scrollTop = 0;
+      requestAnimationFrame(() => {
+        grid.scrollTop = 0;
+      });
+    }
+  }
 }
 
 // ---------------------------------------------------------------- 项目主页 / Star
@@ -248,8 +274,26 @@ const REPO_URL = 'https://github.com/labulaka-ai/account-monitor';
 const STAR_QUIET = 3 * 864e5;   // 装上先自己用三天
 const STAR_GAP = 14 * 864e5;    // 两次提示之间至少两周
 
+/**
+ * 打开外部链接。
+ *
+ * 统一走这里，是因为直接 `window.api.openExternal(url)` 不接返回的 Promise：
+ * 系统里没配默认浏览器、或者被安全策略拦掉时，会变成一个**未处理的 Promise 拒绝**，
+ * 用户看到的是「点了没反应」，控制台里才有原因。
+ */
+function openLink(url) {
+  if (!url) return;
+  const fail = (err) => toast(`打不开浏览器：${esc((err && err.message) || '未知原因')}`, 'bad');
+  try {
+    const p = window.api.openExternal(url);
+    if (p && typeof p.catch === 'function') p.catch(fail);
+  } catch (err) {
+    fail(err);
+  }
+}
+
 function openRepo() {
-  window.api.openExternal(REPO_URL);
+  openLink(REPO_URL);
 }
 
 /** 每次启动记一笔：既算「打开过几次」，也记下第一次用的日子 */
@@ -440,7 +484,19 @@ async function renderAiBox() {
 }
 
 async function refresh() {
-  PLATS = await window.api.listPlats();
+  /**
+   * 刷新失败不能把界面清空。
+   *
+   * 这个函数在几十处被 await（登录完、读完数、关面板、切设置…），
+   * 以前 `PLATS = await …` 一旦后端偶尔回一个错误，异常就一路抛到调用者，
+   * 而多数调用者没有 catch —— 表现是「点了没反应」，界面还停在上一次的数据上。
+   * 保留旧 PLATS 再画一遍，至少界面是活的。
+   */
+  try {
+    PLATS = await window.api.listPlats();
+  } catch (err) {
+    console.error('刷新平台列表失败', err);
+  }
   renderGrid();
 }
 
@@ -748,14 +804,38 @@ function renderMetrics() {
           .filter((k) => byType[k])
           .map((k) => `${TYPE_LABELS[k]}${byType[k]}`);
         const mix = parts.length > 1 ? parts.join('·') : '';
-        return mk('作品', l.works_total != null ? l.works_total : works.length || null, {
-          sub:
-            l.works_total == null
-              ? works.length
-                ? `平台没给总数，已读到 ${works.length} 条`
-                : (r.account && r.account.note) ? '平台确认是 0 条' : '还没读到作品'
-              : mix || `已入库 ${works.length} 条`
-        });
+        /**
+         * 「作品」这个卡位的数字必须 ≥ 下面列表里能看到的条数，否则同一屏自相矛盾：
+         * 平台总数会滞后、口径可能不同（X 头部只算 Posts 不含 Replies），
+         * 快照也可能还留着上一轮的旧数 —— 这时显示 3、列表里 8 条，只会让人以为坏了。
+         *
+         * 取 worksCount（库里实有条数，不受 200 条展示上限影响）兜底；
+         * 真的多出来时，副标题直接说清「平台报 3、库里 8」，不装作没这回事。
+         */
+        const platTotal = l.works_total == null ? null : Number(l.works_total);
+        const storedN =
+          r.account && r.account.worksCount != null ? Number(r.account.worksCount) : works.length;
+        const shownN = platTotal == null ? (storedN || null) : Math.max(platTotal, storedN);
+        /**
+         * 这轮到底读完没有，只有 accounts.last_read 知道（快照里只有一个数）。
+         * 没读完时宁可说「读到 20 / 共 240」，也不要把 240 写成已经到手的数。
+         */
+        const lr = (r.account && r.account.lastRead) || null;
+        const partial = !!(lr && lr.complete === false);
+        const sub = (() => {
+          if (partial && lr.total != null && lr.got < lr.total) {
+            return `读到 ${lr.got} / 共 ${lr.total} 条，这轮没翻完`;
+          }
+          if (partial && lr.total == null && lr.got) return `平台没给总数，读到 ${lr.got} 条`;
+          if (platTotal == null) {
+            if (storedN) return `平台没给总数，已读到 ${storedN} 条`;
+            return (r.account && r.account.note) ? '平台确认是 0 条' : '还没读到作品';
+          }
+          if (shownN === 0 && r.account && r.account.note) return r.account.note;
+          if (shownN > platTotal) return `平台报 ${platTotal} 条，库里实有 ${storedN} 条`;
+          return mix || `已入库 ${storedN} 条`;
+        })();
+        return mk('作品', shownN, { sub });
       }
       case 'reads':
       case 'plays':
@@ -1112,10 +1192,27 @@ const EX_FORMATS = {
   ]
 };
 
-async function openExport(kind) {
+async function openExport(kind, opts = {}) {
   exState.kind = kind || 'data';
   exState.format = EX_FORMATS[exState.kind][0][0];
-  if (!exState.picked.size) exState.picked = new Set();
+  /**
+   * 上一次留下的勾选要**先跟当前账号对一遍**再沿用。
+   *
+   * 两个坑：
+   *   · 勾过的号后来被删掉了 —— 界面上写着「已选 1 个号」，列表里却没有这个号，
+   *     导出出来是空文件，看起来像坏功能；
+   *   · 从详情页导出会把平台范围收窄成当前平台，而主页的「导出全部」如果不重置，
+   *     用户会以为别的平台的号不见了（其实是被上一次的筛选挡住了）。
+   * 所以：号按现存过滤；平台范围只有调用方明确要求保留时才保留。
+   */
+  const aliveAcc = new Set();
+  const alivePlat = new Set();
+  for (const p of PLATS) {
+    alivePlat.add(p.plat);
+    for (const a of p.accounts || []) aliveAcc.add(a.id);
+  }
+  exState.picked = new Set([...exState.picked].filter((id) => aliveAcc.has(id)));
+  if (!opts.keepPlats) exState.plats = new Set([...exState.plats].filter((n) => alivePlat.has(n)));
   await renderExport();
   $('exportSheet').hidden = false;
 }
@@ -1255,8 +1352,19 @@ async function doExport() {
 async function reloadDetail() {
   if (!dxAcc) return;
   const id = dxAcc.account.id;
-  const pl = await window.api.platDetail(dxPlatName);
-  if (pl && pl.ok) dxPlat = pl;
+  /**
+   * 平台详情取失败不能让整个详情页停在旧状态。
+   *
+   * 这一步只影响「平台能力/牌子颜色」这类外壳信息，accountDetail 才是主体；
+   * 以前这里抛出去，后面的 renderTabs / loadAccount 全不执行，
+   * 用户看到的是点了「刷新数据」以后界面一动不动。
+   */
+  try {
+    const pl = await window.api.platDetail(dxPlatName);
+    if (pl && pl.ok) dxPlat = pl;
+  } catch (err) {
+    console.error('取平台详情失败', err);
+  }
   renderTabs();
   await loadAccount(id);
 }
@@ -1334,8 +1442,11 @@ function exportCurrent() {
   const pl = dxAcc.account.plat;
   if (pl && PLATS.some((p) => p.plat === pl && (p.accounts || []).length)) {
     exState.plats = new Set([pl]);
+  } else {
+    exState.plats = new Set();
   }
-  openExport('data');
+  // 平台预选是这一次的意图，必须明确保留 —— 否则 openExport 会把它当「上次残留」清掉
+  openExport('data', { keepPlats: true });
 }
 
 /**
@@ -1507,6 +1618,20 @@ function setPanelOpen(open, plat, meta = {}) {
   if (!open) {
     currentPlat = null;
     hideHint();
+    /**
+     * 关面板必须把「进来之前那一屏」放回去。
+     *
+     * 以前只清 currentPlat：body 上的 `view-detail` 类留在原处，而 #detail 还是隐藏的，
+     * 于是用户看到的是平台列表**少了顶部抬头**（那套抬头只在非详情页显示）。
+     * 最容易撞上的路径：从详情页点「重新登录」→ 面板里没登成 → 点「完成」，
+     * 既不进详情也不回列表，界面像被截了一半。
+     */
+    const back = !!(dxBackFrom && dxPlatName);
+    const backPlat = dxPlatName;
+    const backAcc = dxAcc && dxAcc.account ? dxAcc.account.id : '';
+    dxBackFrom = false;
+    showDetail(false); // 先把详情页状态清干净（会重置 dxAcc / dxPlatName）
+    if (back) openDetail(backPlat, backAcc); // 重新读一遍，别把登录前的旧数据当新的
     return;
   }
 
@@ -1660,14 +1785,16 @@ async function finish() {
 }
 
 async function cancel() {
-  await window.api.closePanel();
+  // 关面板失败也必须把界面放回去——否则用户被卡在一个什么都没有的面板里
+  try {
+    await window.api.closePanel();
+  } catch (err) {
+    console.error('关面板失败', err);
+  }
+  // 从详情页进来的话，setPanelOpen(false) 会把详情页重新打开并重读 ——
+  // 「退回哪一屏」这件事只在那一处判断，别在这里再来一遍
   setPanelOpen(false);
   await refresh();
-  // 从详情页来的，取消之后退回详情页，而不是把用户丢在平台列表上
-  if (dxBackFrom && dxPlatName) {
-    dxBackFrom = false;
-    openDetail(dxPlatName, dxAcc ? dxAcc.account.id : '');
-  }
 }
 
 /**
@@ -1836,7 +1963,10 @@ async function boot() {
   $('btnExport').addEventListener('click', exportCurrent);
   // 主页也能导出（不选号就是全部）—— 详情页不在时也要有入口
   $('btnExportAll').addEventListener('click', () => {
+    // 「全部」就要真的全部：号和平台范围都清空，
+    // 否则会接着上一轮（从详情页导出时收窄的）平台范围，看着像别的号消失了
     exState.picked = new Set();
+    exState.plats = new Set();
     openExport('data');
   });
   $('btnDiag').addEventListener('click', showDiag);
@@ -1999,7 +2129,7 @@ async function boot() {
     }
   });
   $('updateMsg').addEventListener('click', () => {
-    if (updateUrl) window.api.openExternal(updateUrl);
+    if (updateUrl) openLink(updateUrl);
   });
   $('nudgeGo').addEventListener('click', () => {
     openRepo();

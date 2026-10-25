@@ -136,6 +136,42 @@ function stripNoise(src) {
     ok(src.includes('withArg'), '序列化后丢了函数名');
   });
 
+  section('5. 作品总数只许报平台自己给的数');
+  /**
+   * 这一条守的是「静默删数据」，后果比报错严重得多：
+   *
+   * reader 判「这次读全了」的条件是「每一页读到的条数 >= 每一页自报的总数」，
+   * 只有读全了才会把这一轮没出现的作品标成已删除。
+   * 采集器一旦拿「这次读到几条」冒充平台总数，这个条件**恒为真** ——
+   * 于是滚动没滚到、分页没翻完、接口临时只回一页的时候，
+   * 库里那些作品会被整批标成「已不存在」，界面上无声消失。
+   *
+   * 实测复现：库里 50 条，本轮只读到 20 条，50 条全部 gone=1，界面只剩 20 条。
+   * 所以这里直接禁掉「右值里出现 .length」这种写法，改回不去。
+   */
+  await check('没有一处 worksTotal 是从读到的条数派生的', () => {
+    const dir = path.join(__dirname, '..', 'lib', 'platforms');
+    // 注释要保留行号（块注释里的换行不能吞掉），否则报出来的行号对不上
+    const dropComments = (src) =>
+      src
+        .replace(/\/\*[\s\S]*?\*\//g, (s) => s.replace(/[^\n]/g, ''))
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    const bad = [];
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.js')) continue;
+      const src = dropComments(fs.readFileSync(path.join(dir, f), 'utf8'));
+      src.split('\n').forEach((line, i) => {
+        const m = /worksTotal\s*=(?!=)\s*(.+)$/.exec(line);
+        if (!m) return;
+        if (/\.length\b/.test(m[1])) bad.push(`${f}:${i + 1}  ${line.trim()}`);
+      });
+    }
+    ok(
+      bad.length === 0,
+      `这几处拿读到的条数顶替平台总数，会在读不全时误删作品：\n        ${bad.join('\n        ')}`
+    );
+  });
+
   section('汇总');
   if (failures.length === 0) {
     console.log(`\n全部通过：${pass} 项`);

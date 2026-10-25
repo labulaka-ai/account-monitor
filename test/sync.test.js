@@ -477,6 +477,24 @@ function baseRead(over = {}) {
     ok(!ids.includes('w_gone'), '已删除的不扫');
   });
 
+  await check('last_scanned_at 是 ISO 时间戳时，回扫间隔照样生效', () => {
+    /**
+     * 真实库里的 last_scanned_at 是 `2026-10-22T11:00:00.000Z`（nowIso 写的），
+     * 而 published_at 是 `2026-10-22`。两者混用会让日期差算出 NaN，
+     * NaN < every 恒为 false —— 于是每一次读数都会把所有老作品重扫一遍，
+     * 回扫分层等于没有。这个用例就是守住这个格式差异。
+     */
+    const rows = [
+      { id: 'today', published_at: '2026-10-22', last_scanned_at: '2026-10-23T09:30:00.000Z', gone: 0 },
+      { id: 'stale', published_at: '2026-10-22', last_scanned_at: '2026-10-20T09:30:00.000Z', gone: 0 },
+      { id: 'old', published_at: '2026-08-01', last_scanned_at: '2026-10-21T09:30:00.000Z', gone: 0 }
+    ];
+    const ids = sync.pickRescanTargets(rows, TODAY, 10).map((p) => p.row.id);
+    ok(!ids.includes('today'), '今天已经扫过的不该再扫');
+    ok(ids.includes('stale'), '两天前扫过的（7 天内每天档）应再扫');
+    ok(!ids.includes('old'), '80 天前发布、2 天前刚扫过（14 天档）不该再扫');
+  });
+
   await check('达到上限会截断（控制单次成本）', () => {
     const rows = Array.from({ length: 100 }, (_, i) => ({
       id: `w${i}`,
@@ -493,6 +511,184 @@ function baseRead(over = {}) {
     const c = sync.workId('acc2', 'note_1');
     eq(a, b, '同输入应同输出；');
     ok(a !== c, '不同账号必须算出不同 id');
+  });
+
+  // ------------------------------------------------ 8. 误删防护
+  section('8. 读不全时绝不说「作品没了」');
+
+  /**
+   * 这一段守的是全项目最危险的一条路：
+   * `read.complete === true` 时，这一轮没出现的作品会被标成已删除。
+   * 判错的后果不是报错，是用户好好的帖子**静默消失**。
+   *
+   * 真实踩过的坑：采集器读不到平台总数时，拿「这次读到几条」冒充总数，
+   * 于是 reader 的逐页对账「读到的 >= 自报的」恒真 → complete=true →
+   * 库里 50 条、这次只读到 20 条时，剩下 30 条被整批标删。
+   * 实测复现：50 条全部 gone=1，界面上只剩 20 条。
+   */
+  const seedOldWorks = (d, n) => {
+    const ins = d.prepare(
+      `INSERT INTO works (id, account_id, plat_work_id, title, published_at, first_seen_at, last_seen_at)
+       VALUES (?, 'a1', ?, ?, ?, ?, ?)`
+    );
+    const ids = [];
+    for (let i = 0; i < n; i++) {
+      const pid = `n${i}`;
+      ids.push(pid);
+      ins.run(`w${i}`, pid, `旧作品 ${i}`, '2026-10-20', '2026-10-01T00:00:00.000Z', '2026-10-22T00:00:00.000Z');
+    }
+    return ids;
+  };
+  const alive = (d) => d.prepare(`SELECT COUNT(*) AS c FROM works WHERE account_id = 'a1' AND gone = 0`).get().c;
+  const goneCount = (d) => d.prepare(`SELECT COUNT(*) AS c FROM works WHERE account_id = 'a1' AND gone = 1`).get().c;
+
+  await check('没读全（complete=false）时，一条都不许标删', async () => {
+    const d = freshDb();
+    const ids = seedOldWorks(d, 50);
+    const read = {
+      status: 'ok',
+      complete: false,
+      // 采集器没报总数时 reader 就是这么给的：总数缺失，只交出读到的这 20 条
+      account: { followers: 1200 },
+      works: ids.slice(0, 20).map((pid, i) => ({
+        platWorkId: pid,
+        title: pid,
+        publishedAt: '2026-10-20',
+        reads: 100 + i
+      }))
+    };
+    const r = await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    // 先确认这次读数真的落库了：读数被当成「空读」丢掉的话，下面两条断言就是假通过
+    eq(r.result, 'ok', '这次读数该正常落库；');
+    ok(d.prepare(`SELECT COUNT(*) AS c FROM work_metrics`).get().c >= 20, '20 条作品的指标应已写入；');
+    eq(goneCount(d), 0, '读不全时不该有任何作品被标成已删除；');
+    eq(alive(d), 50, '原有 50 条应原样留着；');
+  });
+
+  await check('读全了（complete=true）才允许标删，且只删没出现的那批', async () => {
+    const d = freshDb();
+    const ids = seedOldWorks(d, 50);
+    const read = {
+      status: 'ok',
+      complete: true,
+      worksTotal: 20,
+      account: { followers: 1200 },
+      works: ids.slice(0, 20).map((pid, i) => ({
+        platWorkId: pid,
+        title: pid,
+        publishedAt: '2026-10-20',
+        reads: 100 + i
+      }))
+    };
+    const r = await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    eq(r.result, 'ok', '这次读数该正常落库；');
+    eq(goneCount(d), 30, '读全了才该把没出现的 30 条标删；');
+    eq(alive(d), 20, '这次读到的 20 条必须还在；');
+  });
+
+  /**
+   * 「作品」卡上的数字不能比列表里能看到的还少。
+   *
+   * 真实场景：平台的 head 计数滞后（或口径不同），报 3，
+   * 而库里读完是 8 条、又因为没读全所以一条没删 ——
+   * 界面于是同时写「作品 3」和「已入库 8 条」，用户只会以为数据坏了。
+   */
+  const snapTotal = (d) => {
+    const r = d.prepare(`SELECT works_total FROM snapshots WHERE account_id = 'a1'`).get();
+    return r ? r.works_total : undefined;
+  };
+
+  await check('平台报的总数比库里少时，快照抬到库里实有条数', async () => {
+    const d = freshDb();
+    const ids = seedOldWorks(d, 8);
+    const read = {
+      status: 'ok',
+      complete: false,
+      worksTotal: 3,
+      account: { followers: 1200 },
+      works: ids.map((pid, i) => ({ platWorkId: pid, title: pid, publishedAt: '2026-10-20', reads: 10 + i }))
+    };
+    await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    eq(goneCount(d), 0, '没读全就不该删任何东西；');
+    eq(snapTotal(d), 8, '快照该写 8（库里实有），不能写平台滞后的 3；');
+  });
+
+  await check('平台明说 0 条、这轮也读全了：快照就是 0，不许被抬高', async () => {
+    const d = freshDb();
+    seedOldWorks(d, 8);
+    const read = {
+      status: 'ok',
+      complete: true,
+      worksTotal: 0,
+      worksTotalKnown: true,
+      account: { followers: 1200 },
+      works: []
+    };
+    await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    eq(goneCount(d), 8, '确认 0 条时，原有 8 条该全部标删；');
+    eq(snapTotal(d), 0, '0 是事实，必须原样写 0，不能被「实有条数」抬回去；');
+  });
+
+  /**
+   * 界面要说清「读到 20 / 共 240」，就不能靠快照反推 ——
+   * 快照里的 works_total 只有一个数，而且还会被抬到「库里实有条数」。
+   * 所以每次读数单独记一本账（accounts.last_read）。
+   */
+  await check('读数账本记下「读到多少 / 平台说多少 / 读全没有」', async () => {
+    const d = freshDb();
+    const read = {
+      status: 'ok',
+      complete: false,
+      worksTotal: 20,
+      account: { followers: 1200 },
+      works: [0, 1, 2].map((i) => ({
+        platWorkId: `n${i}`,
+        title: `作品 ${i}`,
+        publishedAt: '2026-10-20',
+        reads: 10 + i
+      }))
+    };
+    await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    const lr = JSON.parse(d.prepare(`SELECT last_read FROM accounts WHERE id = 'a1'`).get().last_read);
+    eq(lr.complete, false, '这轮没读全，账本要如实写；');
+    eq(lr.got, 3, '读到 3 条；');
+    eq(lr.total, 20, '平台说 20 条；');
+    eq(lr.at, NOW, '要记下是哪一次读数；');
   });
 
   // ------------------------------------------------ 汇总

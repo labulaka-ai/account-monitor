@@ -4,8 +4,8 @@
  * 跑：npm test
  *
  * 这一组测的不是「能不能打包」，是「打出来的包能不能直接发出去」。
- * 实测漏过一次：只按字段名过滤，结果页面标题 "拉布拉卡 (@ruixue258) / X"
- * 和 URL "tiktok.com/@hanruixue3" 原样躺在包里 —— 字段名规则永远追不上平台怎么塞身份。
+ * 实测漏过一次：只按字段名过滤，结果页面标题 "示例昵称 (@demo_handle_a) / X"
+ * 和 URL "tiktok.com/@demo_handle_c" 原样躺在包里 —— 字段名规则永远追不上平台怎么塞身份。
  * 所以现在的做法是「按值 + 按字段名 + 按形状」三层，这里逐层验。
  */
 
@@ -43,23 +43,23 @@ function yes(hay, needle, hint) {
 }
 
 // 真实形状的样本：跟实际 diag 文件一样，身份藏在 title / url / note 里
-const IDS = ['拉布拉卡', 'ruixue258', 'hanlabulaka', '100040455994942'];
+const IDS = ['示例昵称', 'demo_handle_a', 'demo_handle_b', '123456789012345678'];
 const scrub = diagPack.makeScrub(IDS);
 
 const SAMPLE = {
   at: '2026-10-24T02:40:19.437Z',
   slug: 'x-1',
-  title: '拉布拉卡 (@ruixue258) / X',
+  title: '示例昵称 (@demo_handle_a) / X',
   loadErr: '',
   interfaces: ['https://x.com/i/api/1.1/hashflags.json'],
   pages: [
     { url: 'https://x.com/home', login: true, account: null, works: null, note: '' },
     {
-      url: 'https://www.tiktok.com/@hanruixue3',
+      url: 'https://www.tiktok.com/@demo_handle_c',
       login: true,
-      account: { nickname: 'hanruixue3', handle: 'hanruixue3', uid: '100040455994942', followers: 128 },
+      account: { nickname: 'demo_handle_c', handle: 'demo_handle_c', uid: '123456789012345678', followers: 128 },
       works: 30,
-      note: '拉布拉卡 的号还没有作品'
+      note: '示例昵称 的号还没有作品'
     },
     { url: '/Users/example/Library/Application Support/data', loadErr: '路径打不开' }
   ],
@@ -72,16 +72,16 @@ const SAMPLE = {
 
   section('1. 按值抹掉（最关键的一层）');
   await check('昵称不会出现在任何字段里', () => {
-    no(JSON.stringify(out), '拉布拉卡', '整包文本');
+    no(JSON.stringify(out), '示例昵称', '整包文本');
   });
   await check('handle 不会出现在任何字段里', () => {
     const t = JSON.stringify(out);
-    no(t, 'ruixue258', '整包文本');
-    no(t, 'hanlabulaka', '整包文本');
-    no(t, 'hanruixue3', '整包文本（URL 里的也算）');
+    no(t, 'demo_handle_a', '整包文本');
+    no(t, 'demo_handle_b', '整包文本');
+    no(t, 'demo_handle_c', '整包文本（URL 里的也算）');
   });
   await check('uid 不会出现', () => {
-    no(JSON.stringify(out), '100040455994942', '整包文本');
+    no(JSON.stringify(out), '123456789012345678', '整包文本');
   });
   await check('标题整段隐去，但保留字数', () => {
     yes(out.title, '已隐藏', 'title');
@@ -103,7 +103,7 @@ const SAMPLE = {
     yes(JSON.stringify(out), '位串', '应标注为 N 位串');
   });
   await check('@handle 形状一律收掉', () => {
-    no(JSON.stringify(out), '@hanruixue3', '@handle');
+    no(JSON.stringify(out), '@demo_handle_c', '@handle');
   });
 
   section('3. 不该破坏诊断价值');
@@ -120,7 +120,7 @@ const SAMPLE = {
     ok('loadErr' in out.pages[2], '字段名应保留');
   });
   await check('页面标题之外的中文正文里，昵称也被抹掉', () => {
-    no(out.pages[1].note, '拉布拉卡', 'note');
+    no(out.pages[1].note, '示例昵称', 'note');
     yes(out.pages[1].note, '已隐藏', 'note 应留占位');
   });
 

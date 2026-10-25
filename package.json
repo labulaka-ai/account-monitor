@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "多平台账号数据留底工具 · 全部本地运行 · 一个号一个环境",
   "author": "labulaka-ai",
-  "license": "AGPL-3.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/labulaka-ai/account-monitor.git"
@@ -16,7 +16,7 @@
   "scripts": {
     "start": "electron .",
     "icon": "electron scripts/make-icon.cjs",
-    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js && node --no-warnings test/scripts.test.js && node --no-warnings test/maintain.test.js && node --no-warnings test/diag_pack.test.js",
+    "test": "node --no-warnings test/run.js && node --no-warnings test/sync.test.js && node --no-warnings test/scripts.test.js && node --no-warnings test/maintain.test.js && node --no-warnings test/diag_pack.test.js && node --no-warnings test/report.test.js && node --no-warnings test/reader.test.js",
     "check:pack": "node scripts/clean-personal.cjs",
     "clean:personal": "node scripts/clean-personal.cjs --move",
     "restore:personal": "node scripts/clean-personal.cjs --restore",

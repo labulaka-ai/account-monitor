@@ -465,6 +465,29 @@ function countWorks(accountId) {
   }
 }
 
+/**
+ * 「最近一次读数的账本」：读到多少 / 平台说多少 / 读全没有。
+ *
+ * 存的是 accounts.last_read（JSON 文本，迁移 v5 加的列）。
+ * 老库、坏值、空串一律返回 null —— 界面拿不到就当没有，绝不猜。
+ */
+function parseLastRead(raw) {
+  try {
+    const o = JSON.parse(raw || '');
+    if (!o || typeof o !== 'object') return null;
+    return {
+      at: String(o.at || ''),
+      complete: !!o.complete,
+      got: Number(o.got) || 0,
+      total: o.total == null ? null : Number(o.total),
+      pages: Number(o.pages) || 0,
+      truncated: !!o.truncated
+    };
+  } catch {
+    return null;
+  }
+}
+
 function platSnapshot() {
   return registry.list().map(({ plat, slug, icon, brand, brandLight, region, adapter }) => {
     const list = accountsOf(plat);
@@ -1218,7 +1241,12 @@ function wireIpc() {
         createdAt: acc.created_at,
         lastOkAt: acc.last_ok_at,
         lastSyncAt: acc.last_sync_at,
-        note: acc.note || ''
+        note: acc.note || '',
+        // 库里实际还在的作品条数（不受下面 works 的 200 条展示上限影响）：
+        // 详情页用它和快照的 works_total 对账，避免出现「作品 3 / 已入库 8 条」
+        worksCount: countWorks(acc.id),
+        // 最近一次读数的账本（读到 N / 平台说 M / 读全没有）
+        lastRead: parseLastRead(acc.last_read)
       },
       latest: snaps[0] || null,
       prev: snaps[1] || null,
@@ -1637,7 +1665,7 @@ function wireIpc() {
       /**
        * 把库里的真实昵称 / handle / uid 一起交给脱敏。
        * 只按字段名过滤是不够的：平台把身份塞在 title 和 url 里，
-       * 实测漏过 "拉布拉卡 (@ruixue258) / X" 和 "tiktok.com/@hanruixue3"。
+       * 实测漏过 "示例昵称 (@demo_handle) / X" 和 "tiktok.com/@demo_handle"。
        */
       let identities = [];
       try {
