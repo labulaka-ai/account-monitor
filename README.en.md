@@ -14,7 +14,7 @@ A **fully local** archive for your multi-platform account numbers. Built for peo
 
 WeChat Official Accounts · Xiaohongshu · Douyin · WeChat Channels · Weibo · Zhihu · Bilibili · X · YouTube · Instagram · Threads · TikTok
 
-<a href="https://github.com/labulaka-ai/account-monitor/releases/download/v0.1.0/promo-am-v1.mp4"><img src="docs/promo-preview.gif" alt="30-second intro" width="100%"></a>
+<a href="https://github.com/labulaka-ai/account-monitor/releases/download/v0.1.1/promo-am-v1.mp4"><img src="docs/promo-preview.gif" alt="30-second intro" width="100%"></a>
 
 > A 30-second concept film — click for the full version (5.6 MB, with sound). The film is motion design; **the two screenshots below are the real app.**
 
@@ -33,8 +33,8 @@ Grab the build for your Mac from [Releases](https://github.com/labulaka-ai/accou
 
 | Your Mac | Download |
 |---|---|
-| Apple silicon (M1–M4) | `account-monitor-0.1.0-mac-arm64.dmg` |
-| Intel | `account-monitor-0.1.0-mac-x64.dmg` |
+| Apple silicon (M1–M4) | `account-monitor-0.1.1-mac-arm64.dmg` |
+| Intel | `account-monitor-0.1.1-mac-x64.dmg` |
 
 **The first launch will be blocked by macOS**, because the app is not signed with an Apple Developer certificate (that is $99/year; this is a personal project). The app is not broken. Either:
 
@@ -47,7 +47,7 @@ or right-click the app in Applications → **Open** → **Open** again. After th
 Only use builds from this repository's Releases, and check the hash if you care:
 
 ```bash
-shasum -a 256 ~/Downloads/account-monitor-0.1.0-mac-arm64.dmg
+shasum -a 256 ~/Downloads/account-monitor-0.1.1-mac-arm64.dmg
 ```
 
 The SHA-256 is in the matching Release notes.

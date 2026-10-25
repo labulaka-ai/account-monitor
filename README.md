@@ -14,7 +14,7 @@
 
 公众号 · 小红书 · 抖音 · 视频号 · 微博 · 知乎 · B站 · X · YouTube · Instagram · Threads · TikTok
 
-<a href="https://github.com/labulaka-ai/account-monitor/releases/download/v0.1.0/promo-am-v1.mp4"><img src="docs/promo-preview.gif" alt="30 秒介绍片" width="100%"></a>
+<a href="https://github.com/labulaka-ai/account-monitor/releases/download/v0.1.1/promo-am-v1.mp4"><img src="docs/promo-preview.gif" alt="30 秒介绍片" width="100%"></a>
 
 > 30 秒概念片，点图看完整版（5.6 MB，有声）。片子里是设计示意；**下面两张是真实界面截图**。
 
@@ -38,8 +38,8 @@
 
 | 你的机器 | 下哪个 |
 |---|---|
-| Apple 芯片（M1/M2/M3/M4） | `account-monitor-0.1.0-mac-arm64.dmg` |
-| Intel 芯片 | `account-monitor-0.1.0-mac-x64.dmg` |
+| Apple 芯片（M1/M2/M3/M4） | `account-monitor-0.1.1-mac-arm64.dmg` |
+| Intel 芯片 | `account-monitor-0.1.1-mac-x64.dmg` |
 
 不确定就点左上角苹果菜单 →「关于本机」，看「芯片」那一行。
 
@@ -55,7 +55,7 @@ xattr -dr com.apple.quarantine /Applications/账号监控.app
 只接受从本仓库 Releases 下载的包，并建议核对一下哈希：
 
 ```bash
-shasum -a 256 ~/Downloads/account-monitor-0.1.0-mac-arm64.dmg
+shasum -a 256 ~/Downloads/account-monitor-0.1.1-mac-arm64.dmg
 ```
 
 SHA-256 写在对应 Release 的说明里。
