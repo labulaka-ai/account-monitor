@@ -2,7 +2,7 @@
 
 # 账号监控 · Account Monitor
 
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg) ![Local only](https://img.shields.io/badge/%E6%95%B0%E6%8D%AE-%E4%B8%8D%E5%87%BA%E6%9C%AC%E6%9C%BA-brightgreen.svg) ![Platforms](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-12%20%E4%B8%AA-blue.svg) ![Deps](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BE%9D%E8%B5%96-0-informational.svg) ![Tests](https://img.shields.io/badge/tests-163%20passed-success.svg)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg) ![Local only](https://img.shields.io/badge/%E6%95%B0%E6%8D%AE-%E4%B8%8D%E5%87%BA%E6%9C%AC%E6%9C%BA-brightgreen.svg) ![Platforms](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-12%20%E4%B8%AA-blue.svg) ![Deps](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BE%9D%E8%B5%96-0-informational.svg) ![Tests](https://img.shields.io/badge/tests-171%20passed-success.svg)
 
 > 作者：**Labulaka**（GitHub [@labulaka-ai](https://github.com/labulaka-ai)）· 公众号「**时空AI深水区**」
 
@@ -153,7 +153,7 @@ npm run restore:personal  # 挪回来
 
 ## 可信度：测试与实测
 
-`npm test` 跑 **7 个套件、163 项断言**，全部是真实数据库和真实判定逻辑，不做 mock：
+`npm test` 跑 **7 个套件、171 项断言**，全部是真实数据库和真实判定逻辑，不做 mock：
 
 | 套件 | 项数 | 守什么 |
 |---|---|---|

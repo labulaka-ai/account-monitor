@@ -691,6 +691,120 @@ function baseRead(over = {}) {
     eq(lr.at, NOW, '要记下是哪一次读数；');
   });
 
+  // ------------------------------------------------ 发布时间归一化
+  section('发布时间：库里只许存 YYYY-MM-DD');
+
+  /** 把一个时间点算成本地日期 —— 测试不能写死时区，否则在别的时区跑就红 */
+  const localDay = (v) => {
+    const d = new Date(v);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+
+  await check('纯日期原样返回', async () => {
+    eq(sync.normPublishedAt('2026-10-20'), '2026-10-20');
+  });
+
+  await check('ISO 串转成本地日期', async () => {
+    eq(sync.normPublishedAt('2026-10-23T07:29:30.922Z'), localDay('2026-10-23T07:29:30.922Z'));
+  });
+
+  await check('跨时区的那条算成第二天（23:30Z 在 +8 是次日）', async () => {
+    const v = '2026-10-23T23:30:00.000Z';
+    eq(sync.normPublishedAt(v), localDay(v));
+  });
+
+  await check('空值给空串，不编日期', async () => {
+    eq(sync.normPublishedAt(''), '');
+    eq(sync.normPublishedAt(null), '');
+    eq(sync.normPublishedAt(undefined), '');
+  });
+
+  await check('认不出的写法原样保留（「3 天前」不能猜成某一天）', async () => {
+    eq(sync.normPublishedAt('3 天前'), '3 天前');
+  });
+
+  await check('写库时 ISO 串落到 published_at 已被收成日期', async () => {
+    const d = freshDb();
+    const read = baseRead({
+      works: [
+        {
+          platWorkId: 'iso1',
+          title: '一条 YouTube 视频',
+          publishedAt: '2026-10-23T07:29:30.922Z',
+          reads: 100,
+          likes: 5
+        }
+      ]
+    });
+    await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    const row = d.prepare(`SELECT published_at FROM works WHERE plat_work_id = 'iso1'`).get();
+    eq(row.published_at, localDay('2026-10-23T07:29:30.922Z'));
+    ok(!String(row.published_at).includes('T'), '库里不该再出现 T 时分');
+  });
+
+  await check('带时分的作品也算得出 age_hours（不是 null）', async () => {
+    const d = freshDb();
+    const read = baseRead({
+      works: [
+        {
+          platWorkId: 'iso2',
+          title: '带时分的作品',
+          publishedAt: '2026-10-20T03:00:00.000Z',
+          reads: 50
+        }
+      ]
+    });
+    await sync.syncAccount({
+      database: d,
+      account: getAccount(d),
+      adapter: ADAPTER,
+      reader: readerOf(read),
+      now: NOW,
+      today: TODAY
+    });
+    const age = d
+      .prepare(
+        `SELECT m.age_hours FROM work_metrics m JOIN works w ON w.id = m.work_id
+          WHERE w.plat_work_id = 'iso2'`
+      )
+      .get().age_hours;
+    ok(age != null, `age_hours 应该算得出来，实际 ${age}`);
+    ok(age > 0, `发布在采集之前，应为正数，实际 ${age}`);
+  });
+
+  await check('迁移 v6 把已经进库的 ISO 串收成日期', async () => {
+    const d = freshDb();
+    d.prepare(
+      `INSERT INTO works (id, account_id, plat_work_id, title, published_at, first_seen_at, last_seen_at)
+       VALUES ('old1', 'a1', 'p_old', '旧作品', '2026-10-23T07:29:30.922Z', ?, ?)`
+    ).run(NOW, NOW);
+    d.prepare(
+      `INSERT INTO works (id, account_id, plat_work_id, title, published_at, first_seen_at, last_seen_at)
+       VALUES ('old2', 'a1', 'p_plain', '本来就是日期', '2026-10-20', ?, ?)`
+    ).run(NOW, NOW);
+    d.prepare(`UPDATE meta SET value = '5' WHERE key = 'schema_version'`).run();
+    const r = db.migrate(d, { dbPath: ':memory:' });
+    eq(r.to, 6, '应升到 v6；');
+    eq(
+      d.prepare(`SELECT published_at FROM works WHERE id = 'old1'`).get().published_at,
+      localDay('2026-10-23T07:29:30.922Z')
+    );
+    eq(
+      d.prepare(`SELECT published_at FROM works WHERE id = 'old2'`).get().published_at,
+      '2026-10-20',
+      '纯日期不该被改动；'
+    );
+    d.close();
+  });
+
   // ------------------------------------------------ 汇总
   section('汇总');
   if (failures.length === 0) {

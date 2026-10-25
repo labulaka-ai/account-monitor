@@ -586,6 +586,37 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * 作品「发布」列怎么显示。
+ *
+ * 库里统一存 `YYYY-MM-DD`（写入时已按本地日期归一），这里只负责让它读起来省地方：
+ * 今年的作品省掉年份 —— 一屏八行全是「2026-」纯属浪费列宽；而这一列只有 84px，
+ * 一条 `2026-10-23T07:29:30.922Z` 会直接压到右边的「观看」数字上（叠成一团）。
+ * 只显示到日、不显示时分：这一列回答的是「哪天发的」，同一列有的带时间有的不带最难看。
+ * 带时分的旧数据仍按本地时区换算 —— 23:30Z 在 +8 区已经是第二天，不能直接截前 10 位。
+ * 认不出的写法（「3 天前」「10月23日」）原样返回：猜一个日期比显示原话更糟。
+ */
+function fmtPub(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return s;
+  let y = Number(m[1]);
+  let mo = Number(m[2]);
+  let da = Number(m[3]);
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s)) {
+    const t = Date.parse(s);
+    if (Number.isFinite(t)) {
+      const d = new Date(t);
+      y = d.getFullYear();
+      mo = d.getMonth() + 1;
+      da = d.getDate();
+    }
+  }
+  const p2 = (n) => String(n).padStart(2, '0');
+  return y === new Date().getFullYear() ? `${p2(mo)}-${p2(da)}` : `${y}-${p2(mo)}-${p2(da)}`;
+}
+
 function showDetail(on) {
   $('detail').hidden = !on;
   $('grid').hidden = !!on;
@@ -1112,7 +1143,9 @@ function renderWorks() {
       const badge = t && t !== 'original' ? `<i class="wtype ${t}">${TYPE_LABELS[t] || t}</i>` : '';
       return `<div class="drow">
         <span class="wtitle" title="${esc(w.title)}">${badge}${title}</span>
-        <span class="wdate">${w.published_at || '—'}</span>
+        <span class="wdate" title="${esc(w.published_at || '')}">${esc(
+          fmtPub(w.published_at)
+        )}</span>
         ${cells.join('')}${ex.join('')}
       </div>`;
     })

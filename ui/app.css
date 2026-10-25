@@ -1326,6 +1326,11 @@ body.panel-open .gear { display: none; }
   font-size: 10.5px;
   color: var(--ink-3);
   white-space: nowrap;
+  /* 列宽是死数（84px），日期写法却是平台给的 —— 认不出的串（「3 天前」）
+     或残留的长 ISO 不能任它溢出去盖住右边的数字，宁可省略，完整值在 title 里 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wnum {

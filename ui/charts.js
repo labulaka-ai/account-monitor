@@ -16,6 +16,27 @@
  */
 
 /**
+ * 作品的发布时间 → 分桶用的「天」（`YYYY-MM-DD`）。
+ *
+ * 库里现在统一是 `YYYY-MM-DD`，但历史数据里可能有完整 ISO 串（YouTube 早期写法）。
+ * 直接拿原串当 Map 的键，同一天发的两条会被算成两天；而在它后面硬拼
+ * `'T00:00:00'` 会得到 `…Z` + `T00:00:00` 这种非法串，`Date.parse` 返回 NaN，
+ * 整条作品就被图表静默丢掉了。
+ */
+function chPubKey(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+  return m ? m[1] : '';
+}
+
+/** 发布日 → 当天零点的时间戳；认不出返回 NaN（调用方要跳过，不要当成 0） */
+function chPubDay(v) {
+  const k = chPubKey(v);
+  return k ? Date.parse(k + 'T00:00:00') : NaN;
+}
+
+/**
  * 图表配色。
  *
  * 原来这几个色是写死的常量，浅色主题下 #3ddc97 / #f5a524 在白底上对比度只有
@@ -367,8 +388,9 @@ function chSeriesOf(acc) {
     const byDay = new Map();
     for (const w of works) {
       const v = w.extra && w.extra[src];
-      if (v == null || !w.published_at) continue;
-      byDay.set(w.published_at, (byDay.get(w.published_at) || 0) + Number(v));
+      const k = chPubKey(w.published_at);
+      if (v == null || !k) continue;
+      byDay.set(k, (byDay.get(k) || 0) + Number(v));
     }
     if (byDay.size >= 2) {
       push(k, [...byDay.entries()].sort().map(([x, y]) => ({ x, y })));
@@ -383,15 +405,16 @@ function chSeriesOf(acc) {
   {
     const byDay = new Map();
     for (const w of works) {
-      if (!w.published_at) continue;
+      const day = chPubKey(w.published_at);
+      if (!day) continue;
       const r = w.reads == null ? null : Number(w.reads);
       if (r == null || r <= 0) continue;
-      const cur = byDay.get(w.published_at) || { reads: 0, inter: 0, n: 0 };
+      const cur = byDay.get(day) || { reads: 0, inter: 0, n: 0 };
       cur.reads += r;
       cur.inter +=
         (Number(w.likes) || 0) + (Number(w.comments) || 0) + (Number(w.shares) || 0) + (Number(w.saves) || 0);
       cur.n++;
-      byDay.set(w.published_at, cur);
+      byDay.set(day, cur);
     }
     const days = [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
     if (days.length >= 2) {
@@ -406,8 +429,9 @@ function chSeriesOf(acc) {
   // 发布量：按天统计有发布的日子（同一天发多条算多条）
   const byDay = new Map();
   for (const w of works) {
-    if (!w.published_at) continue;
-    byDay.set(w.published_at, (byDay.get(w.published_at) || 0) + 1);
+    const day = chPubKey(w.published_at);
+    if (!day) continue;
+    byDay.set(day, (byDay.get(day) || 0) + 1);
   }
   const pubPts = [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([x, y]) => ({ x, y }));
   push('publish', pubPts);
@@ -807,7 +831,7 @@ function chBuildModel(acc, platCaps) {
   const byWeek = new Map();
   for (const w of works) {
     if (!w.published_at) continue;
-    const t = Date.parse(w.published_at + 'T00:00:00');
+    const t = chPubDay(w.published_at);
     if (Number.isNaN(t)) continue;
     const d = new Date(t);
     const dow = (d.getDay() + 6) % 7; // 周一 = 0
@@ -849,7 +873,7 @@ function chBuildModel(acc, platCaps) {
   const byWd = new Map();
   for (const w of works) {
     if (!w.published_at) continue;
-    const t = Date.parse(w.published_at + 'T00:00:00');
+    const t = chPubDay(w.published_at);
     if (Number.isNaN(t)) continue;
     const v = num(w[mainKey]);
     if (v == null) continue;
@@ -864,7 +888,7 @@ function chBuildModel(acc, platCaps) {
     .sort((a, b) => a[0] - b[0])
     .map(([k, v]) => ({ label: WD[k], value: Math.round(v.sum / v.n) }));
   const weekday = {
-    n: works.filter((w) => w.published_at).length,
+    n: works.filter((w) => Number.isFinite(chPubDay(w.published_at))).length,
     enough: wdRows.length >= 3 && weekdayCount(byWd) >= 8,
     rows: wdRows
   };

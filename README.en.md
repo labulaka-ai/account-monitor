@@ -2,7 +2,7 @@
 
 # Account Monitor
 
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg) ![Local only](https://img.shields.io/badge/data-never%20leaves%20your%20machine-brightgreen.svg) ![Platforms](https://img.shields.io/badge/platforms-12-blue.svg) ![Deps](https://img.shields.io/badge/runtime%20deps-0-informational.svg) ![Tests](https://img.shields.io/badge/tests-163%20passed-success.svg)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg) ![Local only](https://img.shields.io/badge/data-never%20leaves%20your%20machine-brightgreen.svg) ![Platforms](https://img.shields.io/badge/platforms-12-blue.svg) ![Deps](https://img.shields.io/badge/runtime%20deps-0-informational.svg) ![Tests](https://img.shields.io/badge/tests-171%20passed-success.svg)
 
 > By **Labulaka** (GitHub [@labulaka-ai](https://github.com/labulaka-ai))
 
@@ -145,7 +145,7 @@ Why so strict: a tool like this needs to still run in three years. Fewer depende
 
 ## Confidence: tests and real-run fixes
 
-`npm test` runs **7 suites, 163 assertions**, against real databases and the real decision logic — no mocks:
+`npm test` runs **7 suites, 171 assertions**, against real databases and the real decision logic — no mocks:
 
 | Suite | Count | Guards |
 |---|---|---|
